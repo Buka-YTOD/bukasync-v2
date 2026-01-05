@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Minus, Plus, Trash2, Users, Send, UserCheck, Clock } from 'lucide-react';
+import { ShoppingBag, Minus, Plus, Trash2, Users, Send, UserCheck, Clock, Wallet } from 'lucide-react';
 import { CartItem, GroupMember, GroupOrder } from '@/types/menu';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -27,6 +27,7 @@ interface SharedCartSheetProps {
   totalItems: number;
   groupTotal: number;
   myTotal: number;
+  submittedTotal: number;
   itemsByPerson: Record<string, { member: GroupMember | null; items: CartItem[]; total: number }>;
   readyMembers: GroupMember[];
   allReady: boolean;
@@ -35,6 +36,7 @@ interface SharedCartSheetProps {
   onToggleReady: () => void;
   onSubmitMyOrder: () => void;
   onSubmitGroupOrder: () => void;
+  onOpenPayment: () => void;
 }
 
 export function SharedCartSheet({
@@ -45,6 +47,7 @@ export function SharedCartSheet({
   totalItems,
   groupTotal,
   myTotal,
+  submittedTotal,
   itemsByPerson,
   readyMembers,
   allReady,
@@ -53,6 +56,7 @@ export function SharedCartSheet({
   onToggleReady,
   onSubmitMyOrder,
   onSubmitGroupOrder,
+  onOpenPayment,
 }: SharedCartSheetProps) {
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -292,69 +296,90 @@ export function SharedCartSheet({
             )}
           </TabsContent>
 
-          <TabsContent value="orders" className="flex-1 overflow-y-auto mt-0 px-6 py-4 data-[state=inactive]:hidden">
-            <AnimatePresence mode="popLayout">
-              {submittedOrders.length === 0 ? (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex flex-col items-center justify-center h-64 text-muted-foreground"
-                >
-                  <Clock className="w-16 h-16 mb-4 opacity-50" />
-                  <p>No orders yet</p>
-                  <p className="text-sm">Your orders will appear here</p>
-                </motion.div>
-              ) : (
-                <div className="space-y-4">
-                  {submittedOrders.map((order, index) => (
-                    <motion.div
-                      key={order.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      className="p-4 bg-muted/50 rounded-xl space-y-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary">
-                            {order.submittedBy === 'Group' ? (
-                              <><Users className="w-3 h-3 mr-1" /> Group</>
-                            ) : (
-                              order.submittedBy
-                            )}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          <TabsContent value="orders" className="flex-1 flex flex-col overflow-hidden mt-0 data-[state=inactive]:hidden">
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <AnimatePresence mode="popLayout">
+                {submittedOrders.length === 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex flex-col items-center justify-center h-64 text-muted-foreground"
+                  >
+                    <Clock className="w-16 h-16 mb-4 opacity-50" />
+                    <p>No orders yet</p>
+                    <p className="text-sm">Your orders will appear here</p>
+                  </motion.div>
+                ) : (
+                  <div className="space-y-4">
+                    {submittedOrders.map((order, index) => (
+                      <motion.div
+                        key={order.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className="p-4 bg-muted/50 rounded-xl space-y-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">
+                              {order.submittedBy === 'Group' ? (
+                                <><Users className="w-3 h-3 mr-1" /> Group</>
+                              ) : (
+                                order.submittedBy
+                              )}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <span className="font-semibold text-primary">
+                            {formatPrice(order.totalAmount)}
                           </span>
                         </div>
-                        <span className="font-semibold text-primary">
-                          {formatPrice(order.totalAmount)}
-                        </span>
-                      </div>
 
-                      {/* Progress bar */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-muted-foreground">{getStatusLabel(order.status)}</span>
-                          <span className="text-primary font-medium">{getStatusProgress(order.status)}%</span>
-                        </div>
-                        <Progress value={getStatusProgress(order.status)} className="h-2" />
-                      </div>
-
-                      {/* Items list */}
-                      <div className="text-sm text-muted-foreground">
-                        {order.items.map((item) => (
-                          <div key={`${item.id}-${item.addedById}`} className="flex justify-between">
-                            <span>{item.quantity}x {item.name}</span>
-                            <span>{formatPrice(item.price * item.quantity)}</span>
+                        {/* Progress bar */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">{getStatusLabel(order.status)}</span>
+                            <span className="text-primary font-medium">{getStatusProgress(order.status)}%</span>
                           </div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  ))}
+                          <Progress value={getStatusProgress(order.status)} className="h-2" />
+                        </div>
+
+                        {/* Items list */}
+                        <div className="text-sm text-muted-foreground">
+                          {order.items.map((item) => (
+                            <div key={`${item.id}-${item.addedById}`} className="flex justify-between">
+                              <span>{item.quantity}x {item.name}</span>
+                              <span>{formatPrice(item.price * item.quantity)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </AnimatePresence>
+            </div>
+            
+            {/* Payment Button - shown when there are submitted orders */}
+            {submittedOrders.length > 0 && (
+              <div className="border-t border-border px-6 py-4 bg-background space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Total to Pay</span>
+                  <span className="font-bold text-xl text-primary">{formatPrice(submittedTotal)}</span>
                 </div>
-              )}
-            </AnimatePresence>
+                <Button
+                  variant="hero"
+                  size="xl"
+                  className="w-full"
+                  onClick={onOpenPayment}
+                >
+                  <Wallet className="w-5 h-5 mr-2" />
+                  Pay Now
+                </Button>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </SheetContent>

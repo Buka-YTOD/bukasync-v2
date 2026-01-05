@@ -19,6 +19,8 @@ export function useGroupSession(tableNumber: number) {
   const [sharedCart, setSharedCart] = useState<CartItem[]>([]);
   const [submittedOrders, setSubmittedOrders] = useState<GroupOrder[]>([]);
   const [isJoined, setIsJoined] = useState(false);
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [sessionComplete, setSessionComplete] = useState(false);
 
   const joinSession = useCallback((name: string) => {
     const colorIndex = members.length % MEMBER_COLORS.length;
@@ -219,12 +221,32 @@ export function useGroupSession(tableNumber: number) {
     return grouped;
   }, [sharedCart, members]);
 
+  const openPayment = useCallback(() => {
+    setIsPaymentOpen(true);
+  }, []);
+
+  const closePayment = useCallback(() => {
+    setIsPaymentOpen(false);
+  }, []);
+
+  const completeSession = useCallback(() => {
+    setSessionComplete(true);
+    setIsPaymentOpen(false);
+  }, []);
+
+  // Calculate total from submitted orders
+  const submittedTotal = useMemo(() => {
+    return submittedOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+  }, [submittedOrders]);
+
   return {
     currentUser,
     members,
     sharedCart,
     submittedOrders,
     isJoined,
+    isPaymentOpen,
+    sessionComplete,
     myItems,
     myTotal,
     groupTotal,
@@ -232,6 +254,7 @@ export function useGroupSession(tableNumber: number) {
     readyMembers,
     allReady,
     itemsByPerson,
+    submittedTotal,
     joinSession,
     leaveSession,
     addItem,
@@ -240,5 +263,8 @@ export function useGroupSession(tableNumber: number) {
     toggleReady,
     submitMyOrder,
     submitGroupOrder,
+    openPayment,
+    closePayment,
+    completeSession,
   };
 }

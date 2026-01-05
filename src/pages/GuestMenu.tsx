@@ -7,6 +7,7 @@ import { SharedCartSheet } from '@/components/guest/SharedCartSheet';
 import { ServiceButtons } from '@/components/guest/ServiceButtons';
 import { JoinSessionModal } from '@/components/guest/JoinSessionModal';
 import { GroupMembersBar } from '@/components/guest/GroupMembersBar';
+import { PaymentSheet } from '@/components/guest/PaymentSheet';
 import { useGroupSession } from '@/hooks/useGroupSession';
 import { menuItems, categories } from '@/data/menuData';
 import { toast } from 'sonner';
@@ -117,7 +118,7 @@ export default function GuestMenu() {
 
       <ServiceButtons tableNumber={TABLE_NUMBER} />
 
-      {session.isJoined && session.totalItems > 0 && (
+      {session.isJoined && (session.totalItems > 0 || session.submittedOrders.length > 0) && (
         <SharedCartSheet
           currentUser={session.currentUser}
           members={session.members}
@@ -126,6 +127,7 @@ export default function GuestMenu() {
           totalItems={session.totalItems}
           groupTotal={session.groupTotal}
           myTotal={session.myTotal}
+          submittedTotal={session.submittedTotal}
           itemsByPerson={session.itemsByPerson}
           readyMembers={session.readyMembers}
           allReady={session.allReady}
@@ -134,8 +136,20 @@ export default function GuestMenu() {
           onToggleReady={session.toggleReady}
           onSubmitMyOrder={handleSubmitMyOrder}
           onSubmitGroupOrder={handleSubmitGroupOrder}
+          onOpenPayment={session.openPayment}
         />
       )}
+
+      {/* Payment Sheet */}
+      <PaymentSheet
+        isOpen={session.isPaymentOpen}
+        onClose={session.closePayment}
+        currentUser={session.currentUser}
+        members={session.members}
+        submittedOrders={session.submittedOrders}
+        totalAmount={session.submittedTotal}
+        myTotal={session.myTotal}
+      />
     </div>
   );
 }
