@@ -144,6 +144,7 @@ export default function GuestMenu() {
       <PaymentSheet
         isOpen={session.isPaymentOpen}
         onClose={session.closePayment}
+        onEndSession={session.endSession}
         currentUser={session.currentUser}
         members={session.members}
         submittedOrders={session.submittedOrders}

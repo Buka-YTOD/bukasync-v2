@@ -234,6 +234,16 @@ export function useGroupSession(tableNumber: number) {
     setIsPaymentOpen(false);
   }, []);
 
+  const endSession = useCallback(() => {
+    setCurrentUser(null);
+    setMembers([]);
+    setSharedCart([]);
+    setSubmittedOrders([]);
+    setIsJoined(false);
+    setIsPaymentOpen(false);
+    setSessionComplete(true);
+  }, []);
+
   // Calculate total from submitted orders
   const submittedTotal = useMemo(() => {
     return submittedOrders.reduce((sum, order) => sum + order.totalAmount, 0);
@@ -266,5 +276,6 @@ export function useGroupSession(tableNumber: number) {
     openPayment,
     closePayment,
     completeSession,
+    endSession,
   };
 }
