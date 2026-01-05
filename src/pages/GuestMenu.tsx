@@ -3,37 +3,78 @@ import { motion } from 'framer-motion';
 import { GuestHeader } from '@/components/guest/GuestHeader';
 import { CategoryTabs } from '@/components/guest/CategoryTabs';
 import { MenuCard } from '@/components/guest/MenuCard';
-import { CartSheet } from '@/components/guest/CartSheet';
+import { SharedCartSheet } from '@/components/guest/SharedCartSheet';
 import { ServiceButtons } from '@/components/guest/ServiceButtons';
-import { useCart } from '@/hooks/useCart';
+import { JoinSessionModal } from '@/components/guest/JoinSessionModal';
+import { GroupMembersBar } from '@/components/guest/GroupMembersBar';
+import { useGroupSession } from '@/hooks/useGroupSession';
 import { menuItems, categories } from '@/data/menuData';
 import { toast } from 'sonner';
 
+const TABLE_NUMBER = 7;
+const RESTAURANT_NAME = "Mama's Kitchen";
+
 export default function GuestMenu() {
   const [activeCategory, setActiveCategory] = useState('All');
-  const cart = useCart();
+  const session = useGroupSession(TABLE_NUMBER);
 
   const filteredItems =
     activeCategory === 'All'
       ? menuItems
       : menuItems.filter((item) => item.category === activeCategory);
 
-  const handleSubmitOrder = () => {
-    if (cart.items.length === 0) {
-      toast.error('Your cart is empty!');
-      return;
-    }
-    toast.success('Order submitted!', {
-      description: 'Your order has been sent to the kitchen.',
+  const handleJoinSession = (name: string) => {
+    session.joinSession(name);
+    toast.success(`Welcome, ${name}!`, {
+      description: 'You can now add items to the group cart.',
     });
-    cart.clearCart();
+  };
+
+  const handleSubmitMyOrder = () => {
+    const order = session.submitMyOrder();
+    if (order) {
+      toast.success('Your order submitted!', {
+        description: 'Your items have been sent to the kitchen.',
+      });
+    }
+  };
+
+  const handleSubmitGroupOrder = () => {
+    const order = session.submitGroupOrder();
+    if (order) {
+      toast.success('Group order submitted!', {
+        description: `${order.items.length} items sent to the kitchen.`,
+      });
+    }
   };
 
   return (
     <div className="min-h-screen bg-background pb-32">
-      <GuestHeader restaurantName="Mama's Kitchen" tableNumber={7} />
+      {/* Join Session Modal */}
+      <JoinSessionModal
+        isOpen={!session.isJoined}
+        tableNumber={TABLE_NUMBER}
+        restaurantName={RESTAURANT_NAME}
+        onJoin={handleJoinSession}
+      />
+
+      <GuestHeader restaurantName={RESTAURANT_NAME} tableNumber={TABLE_NUMBER} />
 
       <main className="container mx-auto px-4 py-6">
+        {/* Group Members Bar */}
+        {session.isJoined && session.members.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex justify-center mb-4"
+          >
+            <GroupMembersBar
+              members={session.members}
+              currentUserId={session.currentUser?.id || ''}
+            />
+          </motion.div>
+        )}
+
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -61,9 +102,12 @@ export default function GuestMenu() {
             >
               <MenuCard
                 item={item}
+                currentUserColor={session.currentUser?.color}
                 onAddToCart={(menuItem) => {
-                  cart.addItem(menuItem);
-                  toast.success(`Added ${menuItem.name} to cart`);
+                  session.addItem(menuItem);
+                  toast.success(`Added ${menuItem.name}`, {
+                    description: 'Your friends can see this in the shared cart',
+                  });
                 }}
               />
             </motion.div>
@@ -71,16 +115,25 @@ export default function GuestMenu() {
         </motion.div>
       </main>
 
-      <ServiceButtons tableNumber={7} />
+      <ServiceButtons tableNumber={TABLE_NUMBER} />
 
-      {cart.totalItems > 0 && (
-        <CartSheet
-          items={cart.items}
-          totalItems={cart.totalItems}
-          totalAmount={cart.totalAmount}
-          onUpdateQuantity={cart.updateQuantity}
-          onRemoveItem={cart.removeItem}
-          onSubmitOrder={handleSubmitOrder}
+      {session.isJoined && session.totalItems > 0 && (
+        <SharedCartSheet
+          currentUser={session.currentUser}
+          members={session.members}
+          sharedCart={session.sharedCart}
+          submittedOrders={session.submittedOrders}
+          totalItems={session.totalItems}
+          groupTotal={session.groupTotal}
+          myTotal={session.myTotal}
+          itemsByPerson={session.itemsByPerson}
+          readyMembers={session.readyMembers}
+          allReady={session.allReady}
+          onUpdateQuantity={session.updateQuantity}
+          onRemoveItem={session.removeItem}
+          onToggleReady={session.toggleReady}
+          onSubmitMyOrder={handleSubmitMyOrder}
+          onSubmitGroupOrder={handleSubmitGroupOrder}
         />
       )}
     </div>

@@ -1,8 +1,13 @@
 import { useState, useCallback } from 'react';
-import { CartItem, MenuItem } from '@/types/menu';
+import { MenuItem } from '@/types/menu';
+
+// Simple cart item without group features (for individual ordering)
+interface SimpleCartItem extends MenuItem {
+  quantity: number;
+}
 
 export function useCart() {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<SimpleCartItem[]>([]);
 
   const addItem = useCallback((menuItem: MenuItem) => {
     setItems((prev) => {

@@ -12,6 +12,34 @@ export interface MenuItem {
 
 export interface CartItem extends MenuItem {
   quantity: number;
+  addedBy: string; // Name of person who added the item
+  addedById: string; // Unique ID of the person
+}
+
+export interface GroupMember {
+  id: string;
+  name: string;
+  color: string;
+  isReady: boolean;
+  joinedAt: Date;
+}
+
+export interface GroupSession {
+  id: string;
+  tableNumber: number;
+  members: GroupMember[];
+  createdAt: Date;
+}
+
+export interface GroupOrder {
+  id: string;
+  sessionId: string;
+  items: CartItem[];
+  submittedBy: string;
+  submittedById: string;
+  status: 'received' | 'preparing' | 'ready' | 'served';
+  createdAt: Date;
+  totalAmount: number;
 }
 
 export interface Order {
