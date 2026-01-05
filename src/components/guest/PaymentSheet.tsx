@@ -35,6 +35,7 @@ type PaymentType = 'individual' | 'full';
 interface PaymentSheetProps {
   isOpen: boolean;
   onClose: () => void;
+  onEndSession: () => void;
   currentUser: GroupMember | null;
   members: GroupMember[];
   submittedOrders: GroupOrder[];
@@ -45,6 +46,7 @@ interface PaymentSheetProps {
 export function PaymentSheet({
   isOpen,
   onClose,
+  onEndSession,
   currentUser,
   members,
   submittedOrders,
@@ -66,38 +68,52 @@ export function PaymentSheet({
 
   const handleMethodSelect = (method: PaymentMethod) => {
     setPaymentMethod(method);
-    if (method === 'pos') {
-      // For POS, skip to success (staff will handle)
-      setStep('success');
-    } else {
-      // For app payment, ask individual or full
-      setStep('type');
-    }
+    // Both methods ask who's paying
+    setStep('type');
   };
 
   const handleTypeSelect = (type: PaymentType) => {
     setPaymentType(type);
-    setStep('processing');
     
-    // Simulate payment processing
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += 10;
-      setProcessingProgress(progress);
-      if (progress >= 100) {
-        clearInterval(interval);
-        setTimeout(() => {
-          if (type === 'full' && members.length > 1) {
-            setStep('tappa');
-          } else {
-            setStep('success');
-          }
-        }, 500);
+    if (paymentMethod === 'pos') {
+      // For POS, go directly to success (staff handles payment)
+      if (type === 'full' && members.length > 1) {
+        setStep('tappa');
+      } else {
+        setStep('success');
       }
-    }, 200);
+    } else {
+      // For app payment, simulate processing
+      setStep('processing');
+      
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += 10;
+        setProcessingProgress(progress);
+        if (progress >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            if (type === 'full' && members.length > 1) {
+              setStep('tappa');
+            } else {
+              setStep('success');
+            }
+          }, 500);
+        }
+      }, 200);
+    }
   };
 
-  const handleClose = () => {
+  const handleComplete = () => {
+    setStep('method');
+    setPaymentMethod(null);
+    setPaymentType(null);
+    setProcessingProgress(0);
+    onEndSession();
+    onClose();
+  };
+
+  const handleCloseSheet = () => {
     setStep('method');
     setPaymentMethod(null);
     setPaymentType(null);
@@ -109,7 +125,7 @@ export function PaymentSheet({
   const splitAmount = members.length > 1 ? totalAmount / members.length : totalAmount;
 
   return (
-    <Sheet open={isOpen} onOpenChange={handleClose}>
+    <Sheet open={isOpen} onOpenChange={handleCloseSheet}>
       <SheetContent className="w-full sm:max-w-lg flex flex-col">
         <SheetHeader>
           <SheetTitle className="font-display text-2xl flex items-center gap-2">
@@ -334,7 +350,7 @@ export function PaymentSheet({
                     {formatPrice(paymentMethod === 'pos' ? totalAmount : amountToPay)}
                   </p>
                 </div>
-                <Button variant="hero" size="xl" onClick={handleClose} className="mt-4">
+                <Button variant="hero" size="xl" onClick={handleComplete} className="mt-4">
                   Done
                 </Button>
               </motion.div>
@@ -358,7 +374,9 @@ export function PaymentSheet({
                   >
                     <Check className="w-8 h-8 text-success" />
                   </motion.div>
-                  <h3 className="text-xl font-semibold">Payment Successful!</h3>
+                  <h3 className="text-xl font-semibold">
+                    {paymentMethod === 'pos' ? 'Ready to Pay!' : 'Payment Successful!'}
+                  </h3>
                   <p className="text-primary font-bold text-2xl">{formatPrice(totalAmount)}</p>
                 </div>
 
@@ -374,26 +392,16 @@ export function PaymentSheet({
                   <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
                   
                   <div className="relative space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-white/20">
-                        <PartyPopper className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-lg">Get Reimbursed with Tappa!</h4>
-                        <p className="text-white/80 text-sm">
-                          Split the bill in seconds
-                        </p>
-                      </div>
+                    <div className="text-center space-y-2">
+                      <h4 className="font-bold text-xl">Did you know?</h4>
+                      <p className="text-white/90">
+                        With <span className="font-bold">Tappa</span>, you can send a payment link to your friends and get reimbursed instantly!
+                      </p>
                     </div>
-
-                    <p className="text-white/90 text-sm">
-                      You paid <span className="font-bold">{formatPrice(totalAmount)}</span> for {members.length} people. 
-                      Use Tappa to send payment links to your friends and get reimbursed instantly!
-                    </p>
 
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-white/10">
                       <div className="flex -space-x-2">
-                        {members.slice(0, 4).map((member, i) => (
+                        {members.filter(m => m.id !== currentUser?.id).slice(0, 4).map((member) => (
                           <div
                             key={member.id}
                             className="w-8 h-8 rounded-full border-2 border-[hsl(168,80%,30%)] flex items-center justify-center text-xs font-bold"
@@ -402,18 +410,13 @@ export function PaymentSheet({
                             {member.name.charAt(0)}
                           </div>
                         ))}
-                        {members.length > 4 && (
-                          <div className="w-8 h-8 rounded-full bg-white/20 border-2 border-[hsl(168,80%,30%)] flex items-center justify-center text-xs">
-                            +{members.length - 4}
-                          </div>
-                        )}
                       </div>
                       <div className="flex-1">
                         <p className="text-sm font-medium">
-                          Each person owes you:
+                          Your friends owe you:
                         </p>
                         <p className="text-lg font-bold">
-                          {formatPrice(totalAmount / members.length)}
+                          {formatPrice(totalAmount - (totalAmount / members.length))}
                         </p>
                       </div>
                     </div>
@@ -430,18 +433,16 @@ export function PaymentSheet({
                         rel="noopener noreferrer"
                       >
                         <Split className="w-4 h-4 mr-2" />
-                        Split Bill with Tappa
+                        Get Reimbursed with Tappa
                         <ExternalLink className="w-4 h-4 ml-2" />
                       </a>
                     </Button>
                   </div>
                 </motion.div>
 
-                <div className="text-center">
-                  <Button variant="ghost" onClick={() => setStep('success')}>
-                    Skip for now
-                  </Button>
-                </div>
+                <Button variant="ghost" onClick={handleComplete} className="w-full">
+                  No thanks, I'm done
+                </Button>
               </motion.div>
             )}
           </AnimatePresence>
