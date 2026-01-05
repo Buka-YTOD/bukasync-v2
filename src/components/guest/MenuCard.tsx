@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/badge';
 interface MenuCardProps {
   item: MenuItem;
   onAddToCart: (item: MenuItem) => void;
+  currentUserColor?: string;
 }
 
-export function MenuCard({ item, onAddToCart }: MenuCardProps) {
+export function MenuCard({ item, onAddToCart, currentUserColor }: MenuCardProps) {
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
@@ -70,6 +71,10 @@ export function MenuCard({ item, onAddToCart }: MenuCardProps) {
             onClick={() => onAddToCart(item)}
             disabled={!item.available}
             className="rounded-full"
+            style={currentUserColor ? { 
+              backgroundColor: currentUserColor,
+              borderColor: currentUserColor 
+            } : undefined}
           >
             <Plus className="w-5 h-5" />
           </Button>
