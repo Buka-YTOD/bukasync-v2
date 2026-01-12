@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
   CreditCard, 
   Smartphone, 
   Users, 
@@ -53,10 +54,14 @@ export function PaymentSheet({
   totalAmount,
   myTotal,
 }: PaymentSheetProps) {
+  const navigate = useNavigate();
   const [step, setStep] = useState<'method' | 'type' | 'processing' | 'success' | 'tappa'>('method');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [paymentType, setPaymentType] = useState<PaymentType | null>(null);
   const [processingProgress, setProcessingProgress] = useState(0);
+  
+  const isGroupDining = members.length > 1;
+  const paidForAll = paymentType === 'full' && isGroupDining;
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -111,6 +116,16 @@ export function PaymentSheet({
     setProcessingProgress(0);
     onEndSession();
     onClose();
+    navigate('/');
+  };
+  
+  const handleGoToTappa = () => {
+    window.open('https://pay-link-naija.lovable.app/', '_blank');
+    handleComplete();
+  };
+  
+  const handleSkipTappa = () => {
+    handleComplete();
   };
 
   const handleCloseSheet = () => {
@@ -319,7 +334,7 @@ export function PaymentSheet({
               </motion.div>
             )}
 
-            {/* Step 4: Success */}
+            {/* Step 4: Success (for individual payments) */}
             {step === 'success' && (
               <motion.div
                 key="success"
@@ -351,12 +366,12 @@ export function PaymentSheet({
                   </p>
                 </div>
                 <Button variant="hero" size="xl" onClick={handleComplete} className="mt-4">
-                  Done
+                  Back to Home
                 </Button>
               </motion.div>
             )}
 
-            {/* Step 5: Tappa Promotion (after paying for all) */}
+            {/* Step 5: Tappa Promotion (after paying for all in group) */}
             {step === 'tappa' && (
               <motion.div
                 key="tappa"
@@ -393,9 +408,10 @@ export function PaymentSheet({
                   
                   <div className="relative space-y-4">
                     <div className="text-center space-y-2">
-                      <h4 className="font-bold text-xl">Did you know?</h4>
-                      <p className="text-white/90">
-                        With <span className="font-bold">Tappa</span>, you can send a payment link to your friends and get reimbursed instantly!
+                      <PartyPopper className="w-10 h-10 mx-auto text-white/90" />
+                      <h4 className="font-bold text-xl">E don pay! 🎉</h4>
+                      <p className="text-white/90 text-sm">
+                        You just covered the bill for your friends. With <span className="font-bold">Tappa</span>, you fit send payment link make dem reimburse you sharp sharp!
                       </p>
                     </div>
 
@@ -422,26 +438,19 @@ export function PaymentSheet({
                     </div>
 
                     <Button
-                      asChild
+                      onClick={handleGoToTappa}
                       variant="secondary"
                       size="lg"
                       className="w-full bg-white text-[hsl(168,80%,30%)] hover:bg-white/90"
                     >
-                      <a
-                        href="https://pay-link-naija.lovable.app/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Split className="w-4 h-4 mr-2" />
-                        Get Reimbursed with Tappa
-                        <ExternalLink className="w-4 h-4 ml-2" />
-                      </a>
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Request Money with Tappa
                     </Button>
                   </div>
                 </motion.div>
 
-                <Button variant="ghost" onClick={handleComplete} className="w-full">
-                  No thanks, I'm done
+                <Button variant="ghost" onClick={handleSkipTappa} className="text-muted-foreground">
+                  No thanks, back to home
                 </Button>
               </motion.div>
             )}
