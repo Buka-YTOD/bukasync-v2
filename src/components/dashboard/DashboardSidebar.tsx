@@ -6,7 +6,8 @@ import {
   Bell, 
   Settings,
   LogOut,
-  ChefHat
+  ChefHat,
+  QrCode
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -18,6 +19,7 @@ interface DashboardSidebarProps {
 
 const navItems = [
   { id: 'orders', label: 'Live Orders', icon: ClipboardList },
+  { id: 'tables', label: 'Tables & QR', icon: QrCode },
   { id: 'menu', label: 'Menu', icon: UtensilsCrossed },
   { id: 'alerts', label: 'Alerts', icon: Bell },
 ];
