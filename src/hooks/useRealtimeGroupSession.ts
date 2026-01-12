@@ -626,11 +626,12 @@ export function useRealtimeGroupSession(tableNumber: number) {
   }, [currentUser, sessionId]);
 
   const removeItem = useCallback(async (itemId: string, addedById: string) => {
-    if (!currentUser || currentUser.id !== addedById) return;
+    if (!currentUser || !sessionId) return;
+    if (currentUser.id !== addedById) return;
 
     try {
       // Find the cart item by menu_item_id and member_id
-      const { data: cartItem } = await supabase
+      const { data: cartItem, error: findError } = await supabase
         .from('cart_items')
         .select('id')
         .eq('session_id', sessionId)
@@ -638,11 +639,20 @@ export function useRealtimeGroupSession(tableNumber: number) {
         .eq('menu_item_id', itemId)
         .single();
 
+      if (findError) {
+        console.error('Error finding cart item:', findError);
+        return;
+      }
+
       if (cartItem) {
-        await supabase
+        const { error: deleteError } = await supabase
           .from('cart_items')
           .delete()
           .eq('id', cartItem.id);
+        
+        if (deleteError) {
+          console.error('Error deleting cart item:', deleteError);
+        }
       }
     } catch (error) {
       console.error('Error removing item:', error);
