@@ -105,7 +105,7 @@ export function SharedCartSheet({
         </Button>
       </SheetTrigger>
       <SheetContent className="w-full sm:max-w-lg flex flex-col p-0 h-[100dvh] max-h-[100dvh]">
-        <SheetHeader className="px-6 pt-6 pb-4">
+        <SheetHeader className="px-6 pt-6 pb-4 shrink-0">
           <SheetTitle className="font-display text-2xl flex items-center gap-2">
             <Users className="w-6 h-6 text-primary" />
             Group Order
@@ -121,8 +121,8 @@ export function SharedCartSheet({
           </div>
         </SheetHeader>
 
-        <Tabs defaultValue="cart" className="flex-1 flex flex-col">
-          <TabsList className="mx-6">
+        <Tabs defaultValue="cart" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <TabsList className="mx-6 shrink-0">
             <TabsTrigger value="cart" className="flex-1">
               Cart ({totalItems})
             </TabsTrigger>
@@ -131,8 +131,8 @@ export function SharedCartSheet({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="cart" className="flex-1 flex flex-col mt-0 data-[state=inactive]:hidden">
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          <TabsContent value="cart" className="flex-1 flex flex-col min-h-0 overflow-hidden mt-0 data-[state=inactive]:hidden">
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4">
               <AnimatePresence mode="popLayout">
                 {Object.keys(itemsByPerson).length === 0 ? (
                   <motion.div
@@ -297,8 +297,8 @@ export function SharedCartSheet({
             )}
           </TabsContent>
 
-          <TabsContent value="orders" className="flex-1 flex flex-col overflow-hidden mt-0 data-[state=inactive]:hidden">
-            <div className="flex-1 overflow-y-auto px-6 py-4">
+          <TabsContent value="orders" className="flex-1 flex flex-col min-h-0 overflow-hidden mt-0 data-[state=inactive]:hidden">
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
               <AnimatePresence mode="popLayout">
                 {submittedOrders.length === 0 ? (
                   <motion.div
