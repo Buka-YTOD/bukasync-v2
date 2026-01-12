@@ -45,7 +45,7 @@ export function CartSheet({
           <span className="font-bold">{formatPrice(totalAmount)}</span>
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-full sm:max-w-lg flex flex-col">
+      <SheetContent className="w-full sm:max-w-lg flex flex-col h-[100dvh] max-h-[100dvh]">
         <SheetHeader>
           <SheetTitle className="font-display text-2xl">Your Order</SheetTitle>
         </SheetHeader>
@@ -125,7 +125,7 @@ export function CartSheet({
         </div>
 
         {items.length > 0 && (
-          <div className="border-t border-border pt-4 space-y-4">
+          <div className="border-t border-border pt-4 space-y-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Subtotal</span>
               <span className="font-semibold">{formatPrice(totalAmount)}</span>
