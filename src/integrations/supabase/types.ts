@@ -14,7 +14,170 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cart_items: {
+        Row: {
+          created_at: string
+          id: string
+          member_id: string
+          menu_item_category: string | null
+          menu_item_id: string
+          menu_item_image: string | null
+          menu_item_name: string
+          menu_item_price: number
+          quantity: number
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          member_id: string
+          menu_item_category?: string | null
+          menu_item_id: string
+          menu_item_image?: string | null
+          menu_item_name: string
+          menu_item_price: number
+          quantity?: number
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          member_id?: string
+          menu_item_category?: string | null
+          menu_item_id?: string
+          menu_item_image?: string | null
+          menu_item_name?: string
+          menu_item_price?: number
+          quantity?: number
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cart_items_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "session_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cart_items_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "dining_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dining_sessions: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          session_code: string
+          status: string
+          table_number: number
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          session_code: string
+          status?: string
+          table_number: number
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          session_code?: string
+          status?: string
+          table_number?: number
+        }
+        Relationships: []
+      }
+      orders: {
+        Row: {
+          created_at: string
+          id: string
+          items: Json
+          session_id: string
+          status: string
+          submitted_by_id: string | null
+          submitted_by_name: string
+          total_amount: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          items: Json
+          session_id: string
+          status?: string
+          submitted_by_id?: string | null
+          submitted_by_name: string
+          total_amount: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          items?: Json
+          session_id?: string
+          status?: string
+          submitted_by_id?: string | null
+          submitted_by_name?: string
+          total_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "dining_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_submitted_by_id_fkey"
+            columns: ["submitted_by_id"]
+            isOneToOne: false
+            referencedRelation: "session_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_members: {
+        Row: {
+          color: string
+          id: string
+          is_ready: boolean
+          joined_at: string
+          name: string
+          session_id: string
+        }
+        Insert: {
+          color: string
+          id?: string
+          is_ready?: boolean
+          joined_at?: string
+          name: string
+          session_id: string
+        }
+        Update: {
+          color?: string
+          id?: string
+          is_ready?: boolean
+          joined_at?: string
+          name?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_members_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "dining_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

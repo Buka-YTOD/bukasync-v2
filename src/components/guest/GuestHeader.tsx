@@ -1,12 +1,21 @@
 import { motion } from 'framer-motion';
-import { MapPin, Users } from 'lucide-react';
+import { MapPin, Users, Copy } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface GuestHeaderProps {
   restaurantName: string;
   tableNumber: number;
+  sessionCode?: string | null;
 }
 
-export function GuestHeader({ restaurantName, tableNumber }: GuestHeaderProps) {
+export function GuestHeader({ restaurantName, tableNumber, sessionCode }: GuestHeaderProps) {
+  const copyCode = () => {
+    if (sessionCode) {
+      navigator.clipboard.writeText(sessionCode);
+      toast.success('Code copied!', { description: 'Share with friends to join' });
+    }
+  };
+
   return (
     <motion.header
       initial={{ opacity: 0, y: -20 }}
@@ -30,9 +39,15 @@ export function GuestHeader({ restaurantName, tableNumber }: GuestHeaderProps) {
               </span>
             </div>
           </div>
-          <div className="w-12 h-12 rounded-full bg-gradient-primary flex items-center justify-center text-primary-foreground font-display font-bold text-lg">
-            BS
-          </div>
+          {sessionCode && (
+            <button
+              onClick={copyCode}
+              className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors"
+            >
+              <span className="font-mono font-bold text-primary tracking-wider">{sessionCode}</span>
+              <Copy className="w-4 h-4 text-primary" />
+            </button>
+          )}
         </div>
       </div>
     </motion.header>

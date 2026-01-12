@@ -8,7 +8,7 @@ import { ServiceButtons } from '@/components/guest/ServiceButtons';
 import { JoinSessionModal } from '@/components/guest/JoinSessionModal';
 import { GroupMembersBar } from '@/components/guest/GroupMembersBar';
 import { PaymentSheet } from '@/components/guest/PaymentSheet';
-import { useGroupSession } from '@/hooks/useGroupSession';
+import { useRealtimeGroupSession } from '@/hooks/useRealtimeGroupSession';
 import { menuItems, categories } from '@/data/menuData';
 import { toast } from 'sonner';
 
@@ -17,22 +17,41 @@ const RESTAURANT_NAME = "Mama's Kitchen";
 
 export default function GuestMenu() {
   const [activeCategory, setActiveCategory] = useState('All');
-  const session = useGroupSession(TABLE_NUMBER);
+  const session = useRealtimeGroupSession(TABLE_NUMBER);
 
   const filteredItems =
     activeCategory === 'All'
       ? menuItems
       : menuItems.filter((item) => item.category === activeCategory);
 
-  const handleJoinSession = (name: string) => {
-    session.joinSession(name);
-    toast.success(`Welcome, ${name}!`, {
-      description: 'You can now add items to the group cart.',
-    });
+  const handleCreateSession = async (name: string) => {
+    try {
+      const result = await session.createSession(name);
+      toast.success(`Welcome, ${name}!`, {
+        description: `Session code: ${result.code} — Share with friends to join!`,
+      });
+    } catch (error) {
+      toast.error('Failed to create session', {
+        description: 'Please try again.',
+      });
+    }
   };
 
-  const handleSubmitMyOrder = () => {
-    const order = session.submitMyOrder();
+  const handleJoinSession = async (code: string, name: string) => {
+    try {
+      await session.joinSession(code, name);
+      toast.success(`Welcome, ${name}!`, {
+        description: 'You joined the group session!',
+      });
+    } catch (error) {
+      toast.error('Failed to join session', {
+        description: 'Check the code and try again.',
+      });
+    }
+  };
+
+  const handleSubmitMyOrder = async () => {
+    const order = await session.submitMyOrder();
     if (order) {
       toast.success('Your order submitted!', {
         description: 'Your items have been sent to the kitchen.',
@@ -40,11 +59,11 @@ export default function GuestMenu() {
     }
   };
 
-  const handleSubmitGroupOrder = () => {
-    const order = session.submitGroupOrder();
+  const handleSubmitGroupOrder = async () => {
+    const order = await session.submitGroupOrder();
     if (order) {
       toast.success('Group order submitted!', {
-        description: `${order.items.length} items sent to the kitchen.`,
+        description: 'All items sent to the kitchen.',
       });
     }
   };
@@ -56,10 +75,16 @@ export default function GuestMenu() {
         isOpen={!session.isJoined}
         tableNumber={TABLE_NUMBER}
         restaurantName={RESTAURANT_NAME}
-        onJoin={handleJoinSession}
+        isLoading={session.isLoading}
+        onCreateSession={handleCreateSession}
+        onJoinSession={handleJoinSession}
       />
 
-      <GuestHeader restaurantName={RESTAURANT_NAME} tableNumber={TABLE_NUMBER} />
+      <GuestHeader 
+        restaurantName={RESTAURANT_NAME} 
+        tableNumber={TABLE_NUMBER} 
+        sessionCode={session.sessionCode}
+      />
 
       <main className="container mx-auto px-4 py-6">
         {/* Group Members Bar */}
