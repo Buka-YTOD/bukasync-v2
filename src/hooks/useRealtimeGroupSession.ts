@@ -93,6 +93,110 @@ export function useRealtimeGroupSession(tableNumber: number) {
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [sessionComplete, setSessionComplete] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [existingSession, setExistingSession] = useState<{ id: string; code: string } | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  // Check for existing active session on this table
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      setCheckingSession(true);
+      try {
+        const { data: session } = await supabase
+          .from('dining_sessions')
+          .select('id, session_code')
+          .eq('table_number', tableNumber)
+          .eq('status', 'active')
+          .single();
+
+        if (session) {
+          setExistingSession({ id: session.id, code: session.session_code });
+        }
+      } catch (error) {
+        // No existing session found, that's fine
+        setExistingSession(null);
+      } finally {
+        setCheckingSession(false);
+      }
+    };
+
+    checkExistingSession();
+  }, [tableNumber]);
+
+  // Auto-join existing session with just a name
+  const joinExistingSession = useCallback(async (name: string) => {
+    if (!existingSession) return;
+    
+    setIsLoading(true);
+    try {
+      // Get current member count for color assignment
+      const { data: existingMembers } = await supabase
+        .from('session_members')
+        .select('*')
+        .eq('session_id', existingSession.id);
+
+      const colorIndex = (existingMembers?.length || 0) % MEMBER_COLORS.length;
+
+      // Add the new member
+      const { data: member, error: memberError } = await supabase
+        .from('session_members')
+        .insert({
+          session_id: existingSession.id,
+          name: name.trim(),
+          color: MEMBER_COLORS[colorIndex],
+          is_ready: false,
+        })
+        .select()
+        .single();
+
+      if (memberError) throw memberError;
+
+      const newMember: GroupMember = {
+        id: member.id,
+        name: member.name,
+        color: member.color,
+        isReady: false,
+        joinedAt: new Date(member.joined_at),
+      };
+
+      // Fetch all data for this session
+      const [membersResult, cartResult, ordersResult] = await Promise.all([
+        supabase.from('session_members').select('*').eq('session_id', existingSession.id).order('joined_at', { ascending: true }),
+        supabase.from('cart_items').select('*, session_members(name)').eq('session_id', existingSession.id),
+        supabase.from('orders').select('*').eq('session_id', existingSession.id).order('created_at', { ascending: true }),
+      ]);
+
+      setSessionId(existingSession.id);
+      setSessionCode(existingSession.code);
+      setCurrentUser(newMember);
+      
+      if (membersResult.data) {
+        setMembers(membersResult.data.map((m) => ({
+          id: m.id,
+          name: m.name,
+          color: m.color,
+          isReady: m.is_ready,
+          joinedAt: new Date(m.joined_at),
+        })));
+      }
+
+      if (cartResult.data) {
+        setSharedCart(cartResult.data.map((item) => mapCartItem(item as DbCartItem & { session_members: { name: string } })));
+      }
+
+      if (ordersResult.data) {
+        setSubmittedOrders(ordersResult.data.map((o) => mapOrder(o as unknown as DbOrder)));
+      }
+
+      setIsJoined(true);
+
+      return { member: newMember };
+    } catch (error) {
+      console.error('Error joining existing session:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [existingSession]);
 
   // Subscribe to realtime updates when we have a session
   useEffect(() => {
@@ -652,6 +756,8 @@ export function useRealtimeGroupSession(tableNumber: number) {
     isPaymentOpen,
     sessionComplete,
     isLoading,
+    checkingSession,
+    existingSession,
     myItems,
     myTotal,
     groupTotal,
@@ -662,6 +768,7 @@ export function useRealtimeGroupSession(tableNumber: number) {
     submittedTotal,
     createSession,
     joinSession,
+    joinExistingSession,
     leaveSession,
     addItem,
     removeItem,

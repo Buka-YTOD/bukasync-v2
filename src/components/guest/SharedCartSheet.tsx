@@ -95,7 +95,8 @@ export function SharedCartSheet({
         <Button 
           variant="hero" 
           size="lg" 
-          className="fixed bottom-6 right-6 z-50 rounded-full shadow-glow"
+          className="fixed bottom-6 right-6 z-50 rounded-full shadow-glow safe-area-bottom"
+          style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
         >
           <ShoppingBag className="w-5 h-5" />
           <span className="ml-2">{totalItems} Items</span>
@@ -103,7 +104,7 @@ export function SharedCartSheet({
           <span className="font-bold">{formatPrice(groupTotal)}</span>
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-full sm:max-w-lg flex flex-col p-0">
+      <SheetContent className="w-full sm:max-w-lg flex flex-col p-0 h-[100dvh] max-h-[100dvh]">
         <SheetHeader className="px-6 pt-6 pb-4">
           <SheetTitle className="font-display text-2xl flex items-center gap-2">
             <Users className="w-6 h-6 text-primary" />
