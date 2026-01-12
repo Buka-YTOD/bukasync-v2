@@ -244,7 +244,7 @@ export function SharedCartSheet({
 
             {/* Bottom actions */}
             {sharedCart.length > 0 && (
-              <div className="border-t border-border px-6 py-4 space-y-4 bg-background">
+              <div className="border-t border-border px-6 pt-4 space-y-4 bg-background pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
                 {/* Totals */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-sm">
@@ -365,7 +365,7 @@ export function SharedCartSheet({
             
             {/* Payment Button - shown when there are submitted orders */}
             {submittedOrders.length > 0 && (
-              <div className="border-t border-border px-6 py-4 bg-background space-y-3">
+              <div className="border-t border-border px-6 pt-4 bg-background space-y-3 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Total to Pay</span>
                   <span className="font-bold text-xl text-primary">{formatPrice(submittedTotal)}</span>
