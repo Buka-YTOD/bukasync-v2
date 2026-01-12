@@ -53,6 +53,19 @@ export default function GuestMenu() {
     }
   };
 
+  const handleJoinExistingSession = async (name: string) => {
+    try {
+      await session.joinExistingSession(name);
+      toast.success(`Welcome, ${name}!`, {
+        description: 'You joined the table session!',
+      });
+    } catch (error) {
+      toast.error('Failed to join session', {
+        description: 'Please try again.',
+      });
+    }
+  };
+
   const handleSubmitMyOrder = async () => {
     const order = await session.submitMyOrder();
     if (order) {
@@ -72,15 +85,18 @@ export default function GuestMenu() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-32">
+    <div className="min-h-[100dvh] bg-background pb-36">
       {/* Join Session Modal */}
       <JoinSessionModal
         isOpen={!session.isJoined}
         tableNumber={tableNumber}
         restaurantName={RESTAURANT_NAME}
         isLoading={session.isLoading}
+        checkingSession={session.checkingSession}
+        existingSession={session.existingSession}
         onCreateSession={handleCreateSession}
         onJoinSession={handleJoinSession}
+        onJoinExistingSession={handleJoinExistingSession}
       />
 
       <GuestHeader 
