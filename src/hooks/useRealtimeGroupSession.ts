@@ -82,6 +82,32 @@ function mapOrder(o: DbOrder): GroupOrder {
   };
 }
 
+// localStorage key for persisting member identity
+const STORAGE_KEY = 'dining_session_member';
+
+interface StoredMember {
+  memberId: string;
+  sessionId: string;
+  tableNumber: number;
+}
+
+function getStoredMember(): StoredMember | null {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setStoredMember(data: StoredMember | null) {
+  if (data) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } else {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+}
+
 export function useRealtimeGroupSession(tableNumber: number) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionCode, setSessionCode] = useState<string | null>(null);
@@ -96,11 +122,82 @@ export function useRealtimeGroupSession(tableNumber: number) {
   const [existingSession, setExistingSession] = useState<{ id: string; code: string } | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
 
-  // Check for existing active session on this table
+  // Check for existing active session and restore member identity
   useEffect(() => {
-    const checkExistingSession = async () => {
+    const checkAndRestoreSession = async () => {
       setCheckingSession(true);
       try {
+        // First check if we have a stored member identity for this table
+        const storedMember = getStoredMember();
+        
+        if (storedMember && storedMember.tableNumber === tableNumber) {
+          // Verify the session is still active and member still exists
+          const [sessionResult, memberResult] = await Promise.all([
+            supabase
+              .from('dining_sessions')
+              .select('id, session_code, status')
+              .eq('id', storedMember.sessionId)
+              .single(),
+            supabase
+              .from('session_members')
+              .select('*')
+              .eq('id', storedMember.memberId)
+              .single(),
+          ]);
+
+          if (
+            sessionResult.data?.status === 'active' &&
+            memberResult.data
+          ) {
+            // Restore the session!
+            const member = memberResult.data;
+            const restoredMember: GroupMember = {
+              id: member.id,
+              name: member.name,
+              color: member.color,
+              isReady: member.is_ready,
+              joinedAt: new Date(member.joined_at),
+            };
+
+            // Fetch all session data
+            const [membersRes, cartRes, ordersRes] = await Promise.all([
+              supabase.from('session_members').select('*').eq('session_id', storedMember.sessionId).order('joined_at', { ascending: true }),
+              supabase.from('cart_items').select('*, session_members(name)').eq('session_id', storedMember.sessionId),
+              supabase.from('orders').select('*').eq('session_id', storedMember.sessionId).order('created_at', { ascending: true }),
+            ]);
+
+            setSessionId(storedMember.sessionId);
+            setSessionCode(sessionResult.data.session_code);
+            setCurrentUser(restoredMember);
+            
+            if (membersRes.data) {
+              setMembers(membersRes.data.map((m) => ({
+                id: m.id,
+                name: m.name,
+                color: m.color,
+                isReady: m.is_ready,
+                joinedAt: new Date(m.joined_at),
+              })));
+            }
+
+            if (cartRes.data) {
+              setSharedCart(cartRes.data.map((item) => mapCartItem(item as DbCartItem & { session_members: { name: string } })));
+            }
+
+            if (ordersRes.data) {
+              setSubmittedOrders(ordersRes.data.map((o) => mapOrder(o as unknown as DbOrder)));
+            }
+
+            setIsJoined(true);
+            setCheckingSession(false);
+            return;
+          } else {
+            // Session ended or member removed, clear storage
+            setStoredMember(null);
+          }
+        }
+
+        // No valid stored session, check for any active session on this table
         const { data: session } = await supabase
           .from('dining_sessions')
           .select('id, session_code')
@@ -110,16 +207,19 @@ export function useRealtimeGroupSession(tableNumber: number) {
 
         if (session) {
           setExistingSession({ id: session.id, code: session.session_code });
+        } else {
+          setExistingSession(null);
         }
       } catch (error) {
         // No existing session found, that's fine
         setExistingSession(null);
+        setStoredMember(null);
       } finally {
         setCheckingSession(false);
       }
     };
 
-    checkExistingSession();
+    checkAndRestoreSession();
   }, [tableNumber]);
 
   // Auto-join existing session with just a name
@@ -165,6 +265,13 @@ export function useRealtimeGroupSession(tableNumber: number) {
         supabase.from('orders').select('*').eq('session_id', existingSession.id).order('created_at', { ascending: true }),
       ]);
 
+      // Save member identity to localStorage
+      setStoredMember({
+        memberId: member.id,
+        sessionId: existingSession.id,
+        tableNumber,
+      });
+
       setSessionId(existingSession.id);
       setSessionCode(existingSession.code);
       setCurrentUser(newMember);
@@ -196,7 +303,7 @@ export function useRealtimeGroupSession(tableNumber: number) {
     } finally {
       setIsLoading(false);
     }
-  }, [existingSession]);
+  }, [existingSession, tableNumber]);
 
   // Subscribe to realtime updates when we have a session
   useEffect(() => {
@@ -334,6 +441,13 @@ export function useRealtimeGroupSession(tableNumber: number) {
         joinedAt: new Date(member.joined_at),
       };
 
+      // Save member identity to localStorage
+      setStoredMember({
+        memberId: member.id,
+        sessionId: session.id,
+        tableNumber,
+      });
+
       setSessionId(session.id);
       setSessionCode(code);
       setCurrentUser(newMember);
@@ -401,6 +515,13 @@ export function useRealtimeGroupSession(tableNumber: number) {
         supabase.from('orders').select('*').eq('session_id', session.id).order('created_at', { ascending: true }),
       ]);
 
+      // Save member identity to localStorage
+      setStoredMember({
+        memberId: member.id,
+        sessionId: session.id,
+        tableNumber: session.table_number,
+      });
+
       setSessionId(session.id);
       setSessionCode(code.toUpperCase());
       setCurrentUser(newMember);
@@ -449,6 +570,9 @@ export function useRealtimeGroupSession(tableNumber: number) {
         .from('session_members')
         .delete()
         .eq('id', currentUser.id);
+
+      // Clear stored member identity
+      setStoredMember(null);
 
       setSessionId(null);
       setSessionCode(null);
@@ -728,6 +852,9 @@ export function useRealtimeGroupSession(tableNumber: number) {
         console.error('Error ending session:', error);
       }
     }
+
+    // Clear stored member identity
+    setStoredMember(null);
 
     setSessionId(null);
     setSessionCode(null);
