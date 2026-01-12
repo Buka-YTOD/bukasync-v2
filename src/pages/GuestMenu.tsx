@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { GuestHeader } from '@/components/guest/GuestHeader';
 import { CategoryTabs } from '@/components/guest/CategoryTabs';
@@ -12,12 +13,14 @@ import { useRealtimeGroupSession } from '@/hooks/useRealtimeGroupSession';
 import { menuItems, categories } from '@/data/menuData';
 import { toast } from 'sonner';
 
-const TABLE_NUMBER = 7;
 const RESTAURANT_NAME = "Mama's Kitchen";
 
 export default function GuestMenu() {
+  const [searchParams] = useSearchParams();
+  const tableNumber = parseInt(searchParams.get('table') || '7', 10);
+  
   const [activeCategory, setActiveCategory] = useState('All');
-  const session = useRealtimeGroupSession(TABLE_NUMBER);
+  const session = useRealtimeGroupSession(tableNumber);
 
   const filteredItems =
     activeCategory === 'All'
@@ -73,7 +76,7 @@ export default function GuestMenu() {
       {/* Join Session Modal */}
       <JoinSessionModal
         isOpen={!session.isJoined}
-        tableNumber={TABLE_NUMBER}
+        tableNumber={tableNumber}
         restaurantName={RESTAURANT_NAME}
         isLoading={session.isLoading}
         onCreateSession={handleCreateSession}
@@ -82,7 +85,7 @@ export default function GuestMenu() {
 
       <GuestHeader 
         restaurantName={RESTAURANT_NAME} 
-        tableNumber={TABLE_NUMBER} 
+        tableNumber={tableNumber} 
         sessionCode={session.sessionCode}
       />
 
@@ -141,7 +144,7 @@ export default function GuestMenu() {
         </motion.div>
       </main>
 
-      <ServiceButtons tableNumber={TABLE_NUMBER} />
+      <ServiceButtons tableNumber={tableNumber} />
 
       {session.isJoined && (session.totalItems > 0 || session.submittedOrders.length > 0) && (
         <SharedCartSheet
