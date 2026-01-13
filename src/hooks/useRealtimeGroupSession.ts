@@ -1,7 +1,11 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { CartItem, MenuItem, GroupMember, GroupOrder } from '@/types/menu';
 import { Json } from '@/integrations/supabase/types';
+import { getOrCreateDeviceToken, getDeviceToken } from '@/lib/deviceToken';
+import { getSupabaseWithToken } from '@/lib/supabaseWithToken';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { Database } from '@/integrations/supabase/types';
 
 // Color palette for group members
 const MEMBER_COLORS = [
@@ -39,6 +43,7 @@ interface DbMember {
   color: string;
   is_ready: boolean;
   joined_at: string;
+  device_token: string | null;
 }
 
 interface DbOrder {
@@ -121,11 +126,34 @@ export function useRealtimeGroupSession(tableNumber: number) {
   const [isLoading, setIsLoading] = useState(false);
   const [existingSession, setExistingSession] = useState<{ id: string; code: string } | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [deviceToken, setDeviceToken] = useState<string | null>(null);
+  
+  // Reference to the authenticated supabase client with device token
+  const supabaseClientRef = useRef<SupabaseClient<Database> | null>(null);
+  
+  // Initialize device token on mount
+  useEffect(() => {
+    const initDeviceToken = async () => {
+      const token = await getOrCreateDeviceToken();
+      setDeviceToken(token);
+      supabaseClientRef.current = getSupabaseWithToken(token);
+    };
+    initDeviceToken();
+  }, []);
+  
+  // Get the supabase client with device token, fallback to regular client
+  const getClient = useCallback((): SupabaseClient<Database> => {
+    return supabaseClientRef.current || supabase;
+  }, []);
 
   // Check for existing active session and restore member identity
   useEffect(() => {
+    if (!deviceToken) return; // Wait for device token to be initialized
+    
     const checkAndRestoreSession = async () => {
       setCheckingSession(true);
+      const client = getClient();
+      
       try {
         // First check if we have a stored member identity for this table
         const storedMember = getStoredMember();
@@ -133,12 +161,12 @@ export function useRealtimeGroupSession(tableNumber: number) {
         if (storedMember && storedMember.tableNumber === tableNumber) {
           // Verify the session is still active and member still exists
           const [sessionResult, memberResult] = await Promise.all([
-            supabase
+            supabase // Use base client for session lookup (public)
               .from('dining_sessions')
               .select('id, session_code, status')
               .eq('id', storedMember.sessionId)
               .single(),
-            supabase
+            client // Use token client for member lookup (needs verification)
               .from('session_members')
               .select('*')
               .eq('id', storedMember.memberId)
@@ -159,11 +187,11 @@ export function useRealtimeGroupSession(tableNumber: number) {
               joinedAt: new Date(member.joined_at),
             };
 
-            // Fetch all session data
+            // Fetch all session data using token client
             const [membersRes, cartRes, ordersRes] = await Promise.all([
-              supabase.from('session_members').select('*').eq('session_id', storedMember.sessionId).order('joined_at', { ascending: true }),
-              supabase.from('cart_items').select('*, session_members(name)').eq('session_id', storedMember.sessionId),
-              supabase.from('orders').select('*').eq('session_id', storedMember.sessionId).order('created_at', { ascending: true }),
+              client.from('session_members').select('*').eq('session_id', storedMember.sessionId).order('joined_at', { ascending: true }),
+              client.from('cart_items').select('*, session_members(name)').eq('session_id', storedMember.sessionId),
+              client.from('orders').select('*').eq('session_id', storedMember.sessionId).order('created_at', { ascending: true }),
             ]);
 
             setSessionId(storedMember.sessionId);
@@ -198,7 +226,7 @@ export function useRealtimeGroupSession(tableNumber: number) {
         }
 
         // No valid stored session, check for any active session on this table
-        const { data: session } = await supabase
+        const { data: session } = await supabase // Use base client for public session discovery
           .from('dining_sessions')
           .select('id, session_code')
           .eq('table_number', tableNumber)
@@ -220,30 +248,33 @@ export function useRealtimeGroupSession(tableNumber: number) {
     };
 
     checkAndRestoreSession();
-  }, [tableNumber]);
+  }, [tableNumber, deviceToken, getClient]);
 
   // Auto-join existing session with just a name
   const joinExistingSession = useCallback(async (name: string) => {
-    if (!existingSession) return;
+    if (!existingSession || !deviceToken) return;
     
     setIsLoading(true);
+    const client = getClient();
+    
     try {
-      // Get current member count for color assignment
+      // Get current member count for color assignment (use base client for initial lookup)
       const { data: existingMembers } = await supabase
         .from('session_members')
-        .select('*')
+        .select('id')
         .eq('session_id', existingSession.id);
 
       const colorIndex = (existingMembers?.length || 0) % MEMBER_COLORS.length;
 
-      // Add the new member
-      const { data: member, error: memberError } = await supabase
+      // Add the new member WITH device token for identification
+      const { data: member, error: memberError } = await client
         .from('session_members')
         .insert({
           session_id: existingSession.id,
           name: name.trim(),
           color: MEMBER_COLORS[colorIndex],
           is_ready: false,
+          device_token: deviceToken,
         })
         .select()
         .single();
@@ -258,11 +289,11 @@ export function useRealtimeGroupSession(tableNumber: number) {
         joinedAt: new Date(member.joined_at),
       };
 
-      // Fetch all data for this session
+      // Fetch all data for this session using token client
       const [membersResult, cartResult, ordersResult] = await Promise.all([
-        supabase.from('session_members').select('*').eq('session_id', existingSession.id).order('joined_at', { ascending: true }),
-        supabase.from('cart_items').select('*, session_members(name)').eq('session_id', existingSession.id),
-        supabase.from('orders').select('*').eq('session_id', existingSession.id).order('created_at', { ascending: true }),
+        client.from('session_members').select('*').eq('session_id', existingSession.id).order('joined_at', { ascending: true }),
+        client.from('cart_items').select('*, session_members(name)').eq('session_id', existingSession.id),
+        client.from('orders').select('*').eq('session_id', existingSession.id).order('created_at', { ascending: true }),
       ]);
 
       // Save member identity to localStorage
@@ -303,11 +334,13 @@ export function useRealtimeGroupSession(tableNumber: number) {
     } finally {
       setIsLoading(false);
     }
-  }, [existingSession, tableNumber]);
+  }, [existingSession, tableNumber, deviceToken, getClient]);
 
   // Subscribe to realtime updates when we have a session
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || !deviceToken) return;
+    
+    const client = getClient();
 
     // Subscribe to members changes
     const membersChannel = supabase
@@ -321,8 +354,8 @@ export function useRealtimeGroupSession(tableNumber: number) {
           filter: `session_id=eq.${sessionId}`,
         },
         async () => {
-          // Refetch members on any change
-          const { data } = await supabase
+          // Refetch members on any change using token client
+          const { data } = await client
             .from('session_members')
             .select('*')
             .eq('session_id', sessionId)
@@ -353,8 +386,8 @@ export function useRealtimeGroupSession(tableNumber: number) {
           filter: `session_id=eq.${sessionId}`,
         },
         async () => {
-          // Refetch cart on any change
-          const { data: cartData } = await supabase
+          // Refetch cart on any change using token client
+          const { data: cartData } = await client
             .from('cart_items')
             .select('*, session_members(name)')
             .eq('session_id', sessionId);
@@ -378,8 +411,8 @@ export function useRealtimeGroupSession(tableNumber: number) {
           filter: `session_id=eq.${sessionId}`,
         },
         async () => {
-          // Refetch orders on any change
-          const { data } = await supabase
+          // Refetch orders on any change using token client
+          const { data } = await client
             .from('orders')
             .select('*')
             .eq('session_id', sessionId)
@@ -397,11 +430,15 @@ export function useRealtimeGroupSession(tableNumber: number) {
       supabase.removeChannel(cartChannel);
       supabase.removeChannel(ordersChannel);
     };
-  }, [sessionId]);
+  }, [sessionId, deviceToken, getClient]);
 
   // Create or join a session
   const createSession = useCallback(async (name: string) => {
+    if (!deviceToken) return;
+    
     setIsLoading(true);
+    const client = getClient();
+    
     try {
       const code = generateSessionCode();
       
@@ -418,15 +455,16 @@ export function useRealtimeGroupSession(tableNumber: number) {
 
       if (sessionError) throw sessionError;
 
-      // Add the creating user as first member
+      // Add the creating user as first member WITH device token
       const colorIndex = 0;
-      const { data: member, error: memberError } = await supabase
+      const { data: member, error: memberError } = await client
         .from('session_members')
         .insert({
           session_id: session.id,
           name: name.trim(),
           color: MEMBER_COLORS[colorIndex],
           is_ready: false,
+          device_token: deviceToken,
         })
         .select()
         .single();
@@ -461,12 +499,16 @@ export function useRealtimeGroupSession(tableNumber: number) {
     } finally {
       setIsLoading(false);
     }
-  }, [tableNumber]);
+  }, [tableNumber, deviceToken, getClient]);
 
   const joinSession = useCallback(async (code: string, name: string) => {
+    if (!deviceToken) return;
+    
     setIsLoading(true);
+    const client = getClient();
+    
     try {
-      // Find the session by code
+      // Find the session by code (use base client for public lookup)
       const { data: session, error: sessionError } = await supabase
         .from('dining_sessions')
         .select('*')
@@ -481,19 +523,20 @@ export function useRealtimeGroupSession(tableNumber: number) {
       // Get current member count for color assignment
       const { data: existingMembers } = await supabase
         .from('session_members')
-        .select('*')
+        .select('id')
         .eq('session_id', session.id);
 
       const colorIndex = (existingMembers?.length || 0) % MEMBER_COLORS.length;
 
-      // Add the new member
-      const { data: member, error: memberError } = await supabase
+      // Add the new member WITH device token
+      const { data: member, error: memberError } = await client
         .from('session_members')
         .insert({
           session_id: session.id,
           name: name.trim(),
           color: MEMBER_COLORS[colorIndex],
           is_ready: false,
+          device_token: deviceToken,
         })
         .select()
         .single();
@@ -508,11 +551,11 @@ export function useRealtimeGroupSession(tableNumber: number) {
         joinedAt: new Date(member.joined_at),
       };
 
-      // Fetch all data for this session
+      // Fetch all data for this session using token client
       const [membersResult, cartResult, ordersResult] = await Promise.all([
-        supabase.from('session_members').select('*').eq('session_id', session.id).order('joined_at', { ascending: true }),
-        supabase.from('cart_items').select('*, session_members(name)').eq('session_id', session.id),
-        supabase.from('orders').select('*').eq('session_id', session.id).order('created_at', { ascending: true }),
+        client.from('session_members').select('*').eq('session_id', session.id).order('joined_at', { ascending: true }),
+        client.from('cart_items').select('*, session_members(name)').eq('session_id', session.id),
+        client.from('orders').select('*').eq('session_id', session.id).order('created_at', { ascending: true }),
       ]);
 
       // Save member identity to localStorage
@@ -553,20 +596,22 @@ export function useRealtimeGroupSession(tableNumber: number) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [deviceToken, getClient]);
 
   const leaveSession = useCallback(async () => {
     if (!currentUser || !sessionId) return;
+    
+    const client = getClient();
 
     try {
       // Delete member's cart items
-      await supabase
+      await client
         .from('cart_items')
         .delete()
         .eq('member_id', currentUser.id);
 
       // Remove member from session
-      await supabase
+      await client
         .from('session_members')
         .delete()
         .eq('id', currentUser.id);
@@ -584,14 +629,16 @@ export function useRealtimeGroupSession(tableNumber: number) {
     } catch (error) {
       console.error('Error leaving session:', error);
     }
-  }, [currentUser, sessionId]);
+  }, [currentUser, sessionId, getClient]);
 
   const addItem = useCallback(async (menuItem: MenuItem) => {
     if (!currentUser || !sessionId) return;
+    
+    const client = getClient();
 
     try {
       // Check if this item already exists for this user
-      const { data: existing } = await supabase
+      const { data: existing } = await client
         .from('cart_items')
         .select('*')
         .eq('session_id', sessionId)
@@ -601,13 +648,13 @@ export function useRealtimeGroupSession(tableNumber: number) {
 
       if (existing) {
         // Update quantity
-        await supabase
+        await client
           .from('cart_items')
           .update({ quantity: existing.quantity + 1 })
           .eq('id', existing.id);
       } else {
         // Insert new item
-        await supabase
+        await client
           .from('cart_items')
           .insert({
             session_id: sessionId,
@@ -623,15 +670,17 @@ export function useRealtimeGroupSession(tableNumber: number) {
     } catch (error) {
       console.error('Error adding item:', error);
     }
-  }, [currentUser, sessionId]);
+  }, [currentUser, sessionId, getClient]);
 
   const removeItem = useCallback(async (itemId: string, addedById: string) => {
     if (!currentUser || !sessionId) return;
     if (currentUser.id !== addedById) return;
+    
+    const client = getClient();
 
     try {
       // Find the cart item by menu_item_id and member_id
-      const { data: cartItem, error: findError } = await supabase
+      const { data: cartItem, error: findError } = await client
         .from('cart_items')
         .select('id')
         .eq('session_id', sessionId)
@@ -645,7 +694,7 @@ export function useRealtimeGroupSession(tableNumber: number) {
       }
 
       if (cartItem) {
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await client
           .from('cart_items')
           .delete()
           .eq('id', cartItem.id);
@@ -657,13 +706,15 @@ export function useRealtimeGroupSession(tableNumber: number) {
     } catch (error) {
       console.error('Error removing item:', error);
     }
-  }, [currentUser, sessionId]);
+  }, [currentUser, sessionId, getClient]);
 
   const updateQuantity = useCallback(async (itemId: string, addedById: string, quantity: number) => {
     if (!currentUser || currentUser.id !== addedById) return;
+    
+    const client = getClient();
 
     try {
-      const { data: cartItem } = await supabase
+      const { data: cartItem } = await client
         .from('cart_items')
         .select('id')
         .eq('session_id', sessionId)
@@ -673,12 +724,12 @@ export function useRealtimeGroupSession(tableNumber: number) {
 
       if (cartItem) {
         if (quantity <= 0) {
-          await supabase
+          await client
             .from('cart_items')
             .delete()
             .eq('id', cartItem.id);
         } else {
-          await supabase
+          await client
             .from('cart_items')
             .update({ quantity })
             .eq('id', cartItem.id);
@@ -687,15 +738,16 @@ export function useRealtimeGroupSession(tableNumber: number) {
     } catch (error) {
       console.error('Error updating quantity:', error);
     }
-  }, [currentUser, sessionId]);
+  }, [currentUser, sessionId, getClient]);
 
   const toggleReady = useCallback(async () => {
     if (!currentUser) return;
-
+    
+    const client = getClient();
     const newReadyState = !currentUser.isReady;
 
     try {
-      await supabase
+      await client
         .from('session_members')
         .update({ is_ready: newReadyState })
         .eq('id', currentUser.id);
@@ -704,18 +756,19 @@ export function useRealtimeGroupSession(tableNumber: number) {
     } catch (error) {
       console.error('Error toggling ready:', error);
     }
-  }, [currentUser]);
+  }, [currentUser, getClient]);
 
   const submitMyOrder = useCallback(async () => {
     if (!currentUser || !sessionId) return;
-
+    
+    const client = getClient();
     const myItems = sharedCart.filter((item) => item.addedById === currentUser.id);
     if (myItems.length === 0) return;
 
     try {
       const totalAmount = myItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-      const { data: order, error } = await supabase
+      const { data: order, error } = await client
         .from('orders')
         .insert({
           session_id: sessionId,
@@ -731,14 +784,14 @@ export function useRealtimeGroupSession(tableNumber: number) {
       if (error) throw error;
 
       // Remove submitted items from cart
-      await supabase
+      await client
         .from('cart_items')
         .delete()
         .eq('session_id', sessionId)
         .eq('member_id', currentUser.id);
 
       // Mark user as ready
-      await supabase
+      await client
         .from('session_members')
         .update({ is_ready: true })
         .eq('id', currentUser.id);
@@ -749,15 +802,17 @@ export function useRealtimeGroupSession(tableNumber: number) {
     } catch (error) {
       console.error('Error submitting order:', error);
     }
-  }, [currentUser, sessionId, sharedCart]);
+  }, [currentUser, sessionId, sharedCart, getClient]);
 
   const submitGroupOrder = useCallback(async () => {
     if (!currentUser || !sessionId || sharedCart.length === 0) return;
+    
+    const client = getClient();
 
     try {
       const totalAmount = sharedCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-      const { data: order, error } = await supabase
+      const { data: order, error } = await client
         .from('orders')
         .insert({
           session_id: sessionId,
@@ -772,17 +827,18 @@ export function useRealtimeGroupSession(tableNumber: number) {
 
       if (error) throw error;
 
-      // Clear the cart
-      await supabase
+      // Clear the cart - only delete own items, others have their own device tokens
+      await client
         .from('cart_items')
         .delete()
-        .eq('session_id', sessionId);
+        .eq('session_id', sessionId)
+        .eq('member_id', currentUser.id);
 
-      // Mark everyone as ready
-      await supabase
+      // Mark self as ready (can only update own record via RLS)
+      await client
         .from('session_members')
         .update({ is_ready: true })
-        .eq('session_id', sessionId);
+        .eq('id', currentUser.id);
 
       setCurrentUser((prev) => prev ? { ...prev, isReady: true } : null);
 
@@ -790,7 +846,7 @@ export function useRealtimeGroupSession(tableNumber: number) {
     } catch (error) {
       console.error('Error submitting group order:', error);
     }
-  }, [currentUser, sessionId, sharedCart]);
+  }, [currentUser, sessionId, sharedCart, getClient]);
 
   // Calculate totals
   const myItems = useMemo(() => {
@@ -852,9 +908,11 @@ export function useRealtimeGroupSession(tableNumber: number) {
   }, []);
 
   const endSession = useCallback(async () => {
+    const client = getClient();
+    
     if (sessionId) {
       try {
-        await supabase
+        await client
           .from('dining_sessions')
           .update({ status: 'completed', completed_at: new Date().toISOString() })
           .eq('id', sessionId);
@@ -875,7 +933,7 @@ export function useRealtimeGroupSession(tableNumber: number) {
     setIsJoined(false);
     setIsPaymentOpen(false);
     setSessionComplete(true);
-  }, [sessionId]);
+  }, [sessionId, getClient]);
 
   // Calculate total from submitted orders
   const submittedTotal = useMemo(() => {

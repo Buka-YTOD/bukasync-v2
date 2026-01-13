@@ -146,6 +146,7 @@ export type Database = {
       session_members: {
         Row: {
           color: string
+          device_token: string | null
           id: string
           is_ready: boolean
           joined_at: string
@@ -154,6 +155,7 @@ export type Database = {
         }
         Insert: {
           color: string
+          device_token?: string | null
           id?: string
           is_ready?: boolean
           joined_at?: string
@@ -162,6 +164,7 @@ export type Database = {
         }
         Update: {
           color?: string
+          device_token?: string | null
           id?: string
           is_ready?: boolean
           joined_at?: string
@@ -183,7 +186,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_member_id_by_device: {
+        Args: { check_device_token: string; check_session_id: string }
+        Returns: string
+      }
+      is_session_member: {
+        Args: { check_device_token: string; check_session_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
