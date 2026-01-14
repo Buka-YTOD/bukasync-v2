@@ -918,20 +918,16 @@ export function useRealtimeGroupSession(tableNumber: number) {
 
       if (error) throw error;
 
-      // Clear the cart - only delete own items, others have their own device tokens
-      await client
-        .from('cart_items')
-        .delete()
-        .eq('session_id', sessionId)
-        .eq('member_id', currentUser.id);
+      // Clear ALL cart items for the session using the security definer function
+      await client.rpc('clear_session_cart', { target_session_id: sessionId });
 
-      // Mark self as ready (can only update own record via RLS)
+      // Reset ready status for all members (can only update own via RLS, but the function handles the rest)
       await client
         .from('session_members')
-        .update({ is_ready: true })
+        .update({ is_ready: false })
         .eq('id', currentUser.id);
 
-      setCurrentUser((prev) => prev ? { ...prev, isReady: true } : null);
+      setCurrentUser((prev) => prev ? { ...prev, isReady: false } : null);
 
       return order;
     } catch (error) {

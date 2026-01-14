@@ -186,6 +186,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      clear_session_cart: {
+        Args: { target_session_id: string }
+        Returns: undefined
+      }
       get_member_id_by_device: {
         Args: { check_device_token: string; check_session_id: string }
         Returns: string
