@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Minus, Plus, Trash2, Users, Send, UserCheck, Clock, Wallet, Eye, X } from 'lucide-react';
+import { ShoppingBag, Minus, Plus, Trash2, Users, Send, UserCheck, Clock, Wallet, Eye } from 'lucide-react';
 import { CartItem, GroupMember, GroupOrder } from '@/types/menu';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -534,17 +534,7 @@ export function SharedCartSheet({
       <Dialog open={!!selectedOrder} onOpenChange={(open) => !open && setSelectedOrder(null)}>
         <DialogContent className="sm:max-w-lg h-[100dvh] sm:h-auto sm:max-h-[85vh] flex flex-col p-0 gap-0">
           <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
-            <div className="flex items-center justify-between">
-              <DialogTitle className="font-display text-xl">Order Details</DialogTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setSelectedOrder(null)}
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
+            <DialogTitle className="font-display text-xl">Order Details</DialogTitle>
             {selectedOrder && (
               <div className="flex items-center gap-2 mt-2">
                 <Badge variant="secondary">
