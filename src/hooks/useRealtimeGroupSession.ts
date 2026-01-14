@@ -6,7 +6,7 @@ import { getOrCreateDeviceToken, getDeviceToken } from '@/lib/deviceToken';
 import { getSupabaseWithToken } from '@/lib/supabaseWithToken';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/integrations/supabase/types';
-
+import { playNewUserSound, playNewOrderSound } from '@/lib/notificationSounds';
 // Color palette for group members
 const MEMBER_COLORS = [
   'hsl(24, 95%, 53%)',   // Primary orange
@@ -336,6 +336,9 @@ export function useRealtimeGroupSession(tableNumber: number) {
     }
   }, [existingSession, tableNumber, deviceToken, getClient]);
 
+  // Track previous members for detecting changes
+  const prevMembersRef = useRef<GroupMember[]>([]);
+  
   // Subscribe to realtime updates when we have a session
   useEffect(() => {
     if (!sessionId || !deviceToken) return;
@@ -348,13 +351,19 @@ export function useRealtimeGroupSession(tableNumber: number) {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'session_members',
           filter: `session_id=eq.${sessionId}`,
         },
-        async () => {
-          // Refetch members on any change using token client
+        async (payload) => {
+          // Play sound when a new user joins (not the current user)
+          const newMemberId = (payload.new as { id: string }).id;
+          if (currentUser && newMemberId !== currentUser.id) {
+            playNewUserSound();
+          }
+          
+          // Refetch members
           const { data } = await client
             .from('session_members')
             .select('*')
@@ -362,13 +371,86 @@ export function useRealtimeGroupSession(tableNumber: number) {
             .order('joined_at', { ascending: true });
           
           if (data) {
-            setMembers(data.map((m) => ({
+            const newMembers = data.map((m) => ({
               id: m.id,
               name: m.name,
               color: m.color,
               isReady: m.is_ready,
               joinedAt: new Date(m.joined_at),
-            })));
+            }));
+            prevMembersRef.current = newMembers;
+            setMembers(newMembers);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'session_members',
+          filter: `session_id=eq.${sessionId}`,
+        },
+        async (payload) => {
+          const updatedMember = payload.new as { id: string; is_ready: boolean };
+          const oldMember = payload.old as { id: string; is_ready: boolean };
+          
+          // Play sound when another user marks as ready (not the current user)
+          if (
+            currentUser &&
+            updatedMember.id !== currentUser.id &&
+            updatedMember.is_ready === true &&
+            oldMember.is_ready === false
+          ) {
+            playNewOrderSound();
+          }
+          
+          // Refetch members
+          const { data } = await client
+            .from('session_members')
+            .select('*')
+            .eq('session_id', sessionId)
+            .order('joined_at', { ascending: true });
+          
+          if (data) {
+            const newMembers = data.map((m) => ({
+              id: m.id,
+              name: m.name,
+              color: m.color,
+              isReady: m.is_ready,
+              joinedAt: new Date(m.joined_at),
+            }));
+            prevMembersRef.current = newMembers;
+            setMembers(newMembers);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'session_members',
+          filter: `session_id=eq.${sessionId}`,
+        },
+        async () => {
+          // Refetch members on delete
+          const { data } = await client
+            .from('session_members')
+            .select('*')
+            .eq('session_id', sessionId)
+            .order('joined_at', { ascending: true });
+          
+          if (data) {
+            const newMembers = data.map((m) => ({
+              id: m.id,
+              name: m.name,
+              color: m.color,
+              isReady: m.is_ready,
+              joinedAt: new Date(m.joined_at),
+            }));
+            prevMembersRef.current = newMembers;
+            setMembers(newMembers);
           }
         }
       )
@@ -430,7 +512,7 @@ export function useRealtimeGroupSession(tableNumber: number) {
       supabase.removeChannel(cartChannel);
       supabase.removeChannel(ordersChannel);
     };
-  }, [sessionId, deviceToken, getClient]);
+  }, [sessionId, deviceToken, getClient, currentUser]);
 
   // Create or join a session
   const createSession = useCallback(async (name: string) => {
