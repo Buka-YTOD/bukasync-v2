@@ -103,6 +103,8 @@ export function SharedCartSheet({
   // State for confirmation modals
   const [itemToRemove, setItemToRemove] = useState<{ id: string; addedById: string; name: string } | null>(null);
   const [showUnreadyConfirm, setShowUnreadyConfirm] = useState(false);
+  const [showSubmitMineConfirm, setShowSubmitMineConfirm] = useState(false);
+  const [showSubmitAllConfirm, setShowSubmitAllConfirm] = useState(false);
 
   const handleRemoveClick = (item: CartItem) => {
     setItemToRemove({ id: item.id, addedById: item.addedById, name: item.name });
@@ -128,6 +130,24 @@ export function SharedCartSheet({
   const confirmUnready = () => {
     onToggleReady();
     setShowUnreadyConfirm(false);
+  };
+
+  const handleSubmitMine = () => {
+    setShowSubmitMineConfirm(true);
+  };
+
+  const confirmSubmitMine = () => {
+    onSubmitMyOrder();
+    setShowSubmitMineConfirm(false);
+  };
+
+  const handleSubmitAll = () => {
+    setShowSubmitAllConfirm(true);
+  };
+
+  const confirmSubmitAll = () => {
+    onSubmitGroupOrder();
+    setShowSubmitAllConfirm(false);
   };
 
   return (
@@ -314,7 +334,7 @@ export function SharedCartSheet({
                   <Button
                     variant="soft"
                     size="lg"
-                    onClick={onSubmitMyOrder}
+                    onClick={handleSubmitMine}
                     disabled={!hasMyItems}
                     className="flex-col h-auto py-3"
                   >
@@ -324,7 +344,7 @@ export function SharedCartSheet({
                   <Button
                     variant="hero"
                     size="lg"
-                    onClick={onSubmitGroupOrder}
+                    onClick={handleSubmitAll}
                     disabled={!allReady || sharedCart.length === 0}
                     className="flex-col h-auto py-3"
                   >
@@ -457,6 +477,44 @@ export function SharedCartSheet({
             <AlertDialogCancel>Stay Ready</AlertDialogCancel>
             <AlertDialogAction onClick={confirmUnready}>
               I'm Not Ready
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Submit Mine Confirmation Dialog */}
+      <AlertDialog open={showSubmitMineConfirm} onOpenChange={setShowSubmitMineConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Submit Your Order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You're about to submit {myItems.length} item{myItems.length !== 1 ? 's' : ''} totaling {formatPrice(myTotal)}. 
+              Your items will be sent to the kitchen and removed from the shared cart.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSubmitMine}>
+              Submit My Order
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Submit All Confirmation Dialog */}
+      <AlertDialog open={showSubmitAllConfirm} onOpenChange={setShowSubmitAllConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Submit Group Order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You're about to submit {sharedCart.length} item{sharedCart.length !== 1 ? 's' : ''} for the entire group totaling {formatPrice(groupTotal)}. 
+              All items from all members will be sent to the kitchen and the cart will be cleared.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSubmitAll}>
+              Submit Group Order
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
