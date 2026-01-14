@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, Minus, Plus, Trash2, Users, Send, UserCheck, Clock, Wallet } from 'lucide-react';
 import { CartItem, GroupMember, GroupOrder } from '@/types/menu';
@@ -18,6 +19,16 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface SharedCartSheetProps {
   currentUser: GroupMember | null;
@@ -88,6 +99,36 @@ export function SharedCartSheet({
 
   const myItems = currentUser ? sharedCart.filter((item) => item.addedById === currentUser.id) : [];
   const hasMyItems = myItems.length > 0;
+
+  // State for confirmation modals
+  const [itemToRemove, setItemToRemove] = useState<{ id: string; addedById: string; name: string } | null>(null);
+  const [showUnreadyConfirm, setShowUnreadyConfirm] = useState(false);
+
+  const handleRemoveClick = (item: CartItem) => {
+    setItemToRemove({ id: item.id, addedById: item.addedById, name: item.name });
+  };
+
+  const confirmRemove = () => {
+    if (itemToRemove) {
+      onRemoveItem(itemToRemove.id, itemToRemove.addedById);
+      setItemToRemove(null);
+    }
+  };
+
+  const handleToggleReady = () => {
+    if (currentUser?.isReady) {
+      // User is trying to unmark as ready, show confirmation
+      setShowUnreadyConfirm(true);
+    } else {
+      // User is marking as ready, no confirmation needed
+      onToggleReady();
+    }
+  };
+
+  const confirmUnready = () => {
+    onToggleReady();
+    setShowUnreadyConfirm(false);
+  };
 
   return (
     <Sheet>
@@ -221,7 +262,7 @@ export function SharedCartSheet({
                                   variant="ghost"
                                   size="icon"
                                   className="h-7 w-7 text-destructive ml-auto"
-                                  onClick={() => onRemoveItem(item.id, item.addedById)}
+                                  onClick={() => handleRemoveClick(item)}
                                 >
                                   <Trash2 className="w-3 h-3" />
                                 </Button>
@@ -262,7 +303,7 @@ export function SharedCartSheet({
                   variant={currentUser?.isReady ? 'success' : 'outline'}
                   size="lg"
                   className="w-full"
-                  onClick={onToggleReady}
+                  onClick={handleToggleReady}
                 >
                   <UserCheck className="w-4 h-4 mr-2" />
                   {currentUser?.isReady ? "I'm Ready!" : "Mark as Ready"}
@@ -384,6 +425,42 @@ export function SharedCartSheet({
           </TabsContent>
         </Tabs>
       </SheetContent>
+
+      {/* Remove Item Confirmation Dialog */}
+      <AlertDialog open={!!itemToRemove} onOpenChange={(open) => !open && setItemToRemove(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Item?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove "{itemToRemove?.name}" from your cart?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRemove} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unready Confirmation Dialog */}
+      <AlertDialog open={showUnreadyConfirm} onOpenChange={setShowUnreadyConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change Ready Status?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are currently marked as ready. Are you sure you want to change your status back to not ready?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay Ready</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmUnready}>
+              I'm Not Ready
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }
