@@ -39,7 +39,7 @@ export function ServiceButtons({ tableNumber }: ServiceButtonsProps) {
   ];
 
   return (
-    <div className="fixed bottom-24 left-6 z-40">
+    <div className="fixed bottom-24 right-6 z-40">
       {/* Backdrop */}
       <AnimatePresence>
         {isOpen && (
@@ -60,16 +60,16 @@ export function ServiceButtons({ tableNumber }: ServiceButtonsProps) {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            className="absolute bottom-16 left-0 flex flex-col gap-3"
+            className="absolute bottom-16 right-0 flex flex-col gap-3 items-end"
           >
             {actions.map((action, index) => (
               <motion.div
                 key={action.label}
-                initial={{ opacity: 0, x: -20, y: 20 }}
+                initial={{ opacity: 0, x: 20, y: 20 }}
                 animate={{ opacity: 1, x: 0, y: 0 }}
-                exit={{ opacity: 0, x: -20, y: 20 }}
+                exit={{ opacity: 0, x: 20, y: 20 }}
                 transition={{ delay: index * 0.05 }}
-                className="flex items-center gap-3"
+                className="flex items-center gap-3 flex-row-reverse"
               >
                 <Button
                   variant="glass"
