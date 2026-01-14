@@ -769,6 +769,11 @@ export function useRealtimeGroupSession(tableNumber: number) {
     
     const client = getClient();
 
+    // Optimistically remove item from UI
+    setSharedCart((prev) => prev.filter(
+      (item) => !(item.id === itemId && item.addedById === addedById)
+    ));
+
     try {
       // Find the cart item by menu_item_id and member_id
       const { data: cartItem, error: findError } = await client
@@ -874,12 +879,20 @@ export function useRealtimeGroupSession(tableNumber: number) {
 
       if (error) throw error;
 
+      // Optimistically update orders state
+      if (order) {
+        setSubmittedOrders((prev) => [...prev, mapOrder(order as unknown as DbOrder)]);
+      }
+
       // Remove submitted items from cart
       await client
         .from('cart_items')
         .delete()
         .eq('session_id', sessionId)
         .eq('member_id', currentUser.id);
+
+      // Optimistically remove my items from cart
+      setSharedCart((prev) => prev.filter((item) => item.addedById !== currentUser.id));
 
       // Mark user as ready
       await client
@@ -918,8 +931,16 @@ export function useRealtimeGroupSession(tableNumber: number) {
 
       if (error) throw error;
 
+      // Optimistically update orders state
+      if (order) {
+        setSubmittedOrders((prev) => [...prev, mapOrder(order as unknown as DbOrder)]);
+      }
+
       // Clear ALL cart items for the session using the security definer function
       await client.rpc('clear_session_cart', { target_session_id: sessionId });
+
+      // Optimistically clear cart
+      setSharedCart([]);
 
       // Reset ready status for all members (can only update own via RLS, but the function handles the rest)
       await client
@@ -928,6 +949,9 @@ export function useRealtimeGroupSession(tableNumber: number) {
         .eq('id', currentUser.id);
 
       setCurrentUser((prev) => prev ? { ...prev, isReady: false } : null);
+      
+      // Optimistically reset ready status for all members in UI
+      setMembers((prev) => prev.map((m) => ({ ...m, isReady: false })));
 
       return order;
     } catch (error) {
