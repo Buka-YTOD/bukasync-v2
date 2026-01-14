@@ -7,6 +7,7 @@ import { getSupabaseWithToken } from '@/lib/supabaseWithToken';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/integrations/supabase/types';
 import { playNewUserSound, playNewOrderSound } from '@/lib/notificationSounds';
+import { toast } from '@/hooks/use-toast';
 // Color palette for group members
 const MEMBER_COLORS = [
   'hsl(24, 95%, 53%)',   // Primary orange
@@ -357,10 +358,14 @@ export function useRealtimeGroupSession(tableNumber: number) {
           filter: `session_id=eq.${sessionId}`,
         },
         async (payload) => {
-          // Play sound when a new user joins (not the current user)
-          const newMemberId = (payload.new as { id: string }).id;
-          if (currentUser && newMemberId !== currentUser.id) {
+          // Play sound and show toast when a new user joins (not the current user)
+          const newMember = payload.new as { id: string; name: string };
+          if (currentUser && newMember.id !== currentUser.id) {
             playNewUserSound();
+            toast({
+              title: "New guest joined! 🎉",
+              description: `${newMember.name} has joined your table`,
+            });
           }
           
           // Refetch members
@@ -392,10 +397,10 @@ export function useRealtimeGroupSession(tableNumber: number) {
           filter: `session_id=eq.${sessionId}`,
         },
         async (payload) => {
-          const updatedMember = payload.new as { id: string; is_ready: boolean };
+          const updatedMember = payload.new as { id: string; name: string; is_ready: boolean };
           const oldMember = payload.old as { id: string; is_ready: boolean };
           
-          // Play sound when another user marks as ready (not the current user)
+          // Play sound and show toast when another user marks as ready (not the current user)
           if (
             currentUser &&
             updatedMember.id !== currentUser.id &&
@@ -403,6 +408,10 @@ export function useRealtimeGroupSession(tableNumber: number) {
             oldMember.is_ready === false
           ) {
             playNewOrderSound();
+            toast({
+              title: "Guest is ready! ✅",
+              description: `${updatedMember.name} has marked their order as ready`,
+            });
           }
           
           // Refetch members
