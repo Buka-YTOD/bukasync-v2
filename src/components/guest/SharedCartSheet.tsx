@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Minus, Plus, Trash2, Users, Send, UserCheck, Clock, Wallet, ChevronDown, ChevronUp } from 'lucide-react';
+import { ShoppingBag, Minus, Plus, Trash2, Users, Send, UserCheck, Clock, Wallet, Eye, X } from 'lucide-react';
 import { CartItem, GroupMember, GroupOrder } from '@/types/menu';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -29,6 +29,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface SharedCartSheetProps {
   currentUser: GroupMember | null;
@@ -106,12 +112,8 @@ export function SharedCartSheet({
   const [showSubmitMineConfirm, setShowSubmitMineConfirm] = useState(false);
   const [showSubmitAllConfirm, setShowSubmitAllConfirm] = useState(false);
   
-  // State for expanded order details
-  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
-  
-  const toggleOrderDetails = (orderId: string) => {
-    setExpandedOrderId((prev) => (prev === orderId ? null : orderId));
-  };
+  // State for order details modal
+  const [selectedOrder, setSelectedOrder] = useState<GroupOrder | null>(null);
 
   const handleRemoveClick = (item: CartItem) => {
     setItemToRemove({ id: item.id, addedById: item.addedById, name: item.name });
@@ -380,100 +382,53 @@ export function SharedCartSheet({
                   </motion.div>
                 ) : (
                   <div className="space-y-4">
-                    {submittedOrders.map((order, index) => {
-                      const isExpanded = expandedOrderId === order.id;
-                      return (
-                        <motion.div
-                          key={order.id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.1 }}
-                          className="p-4 bg-muted/50 rounded-xl space-y-3"
+                    {submittedOrders.map((order, index) => (
+                      <motion.div
+                        key={order.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className="p-4 bg-muted/50 rounded-xl space-y-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">
+                              {order.submittedBy === 'Group' ? (
+                                <><Users className="w-3 h-3 mr-1" /> Group</>
+                              ) : (
+                                order.submittedBy
+                              )}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <span className="font-semibold text-primary">
+                            {formatPrice(order.totalAmount)}
+                          </span>
+                        </div>
+
+                        {/* Progress bar */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">{getStatusLabel(order.status)}</span>
+                            <span className="text-primary font-medium">{getStatusProgress(order.status)}%</span>
+                          </div>
+                          <Progress value={getStatusProgress(order.status)} className="h-2" />
+                        </div>
+
+                        {/* View Details Button */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setSelectedOrder(order)}
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Badge variant="secondary">
-                                {order.submittedBy === 'Group' ? (
-                                  <><Users className="w-3 h-3 mr-1" /> Group</>
-                                ) : (
-                                  order.submittedBy
-                                )}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                            <span className="font-semibold text-primary">
-                              {formatPrice(order.totalAmount)}
-                            </span>
-                          </div>
-
-                          {/* Progress bar */}
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-xs">
-                              <span className="text-muted-foreground">{getStatusLabel(order.status)}</span>
-                              <span className="text-primary font-medium">{getStatusProgress(order.status)}%</span>
-                            </div>
-                            <Progress value={getStatusProgress(order.status)} className="h-2" />
-                          </div>
-
-                          {/* View Details Button */}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full justify-between text-muted-foreground hover:text-foreground"
-                            onClick={() => toggleOrderDetails(order.id)}
-                          >
-                            <span className="text-xs">
-                              {order.items.length} {order.items.length === 1 ? 'item' : 'items'}
-                            </span>
-                            <span className="flex items-center gap-1 text-xs">
-                              {isExpanded ? 'Hide Details' : 'View Details'}
-                              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                            </span>
-                          </Button>
-
-                          {/* Collapsible Items list */}
-                          <AnimatePresence>
-                            {isExpanded && (
-                              <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="overflow-hidden"
-                              >
-                                <div className="pt-2 border-t border-border space-y-2">
-                                  {order.items.map((item) => (
-                                    <div 
-                                      key={`${item.id}-${item.addedById}`} 
-                                      className="flex items-center gap-3 p-2 bg-background/50 rounded-lg"
-                                    >
-                                      {item.image && (
-                                        <img
-                                          src={item.image}
-                                          alt={item.name}
-                                          className="w-10 h-10 object-cover rounded-md"
-                                        />
-                                      )}
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate">{item.name}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                          {item.quantity} × {formatPrice(item.price)}
-                                        </p>
-                                      </div>
-                                      <span className="text-sm font-semibold text-primary">
-                                        {formatPrice(item.price * item.quantity)}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </motion.div>
-                      );
-                    })}
+                          <Eye className="w-4 h-4 mr-2" />
+                          View Details ({order.items.length} {order.items.length === 1 ? 'item' : 'items'})
+                        </Button>
+                      </motion.div>
+                    ))}
                   </div>
                 )}
               </AnimatePresence>
@@ -574,6 +529,104 @@ export function SharedCartSheet({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Order Details Modal */}
+      <Dialog open={!!selectedOrder} onOpenChange={(open) => !open && setSelectedOrder(null)}>
+        <DialogContent className="sm:max-w-lg h-[100dvh] sm:h-auto sm:max-h-[85vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="font-display text-xl">Order Details</DialogTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setSelectedOrder(null)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            {selectedOrder && (
+              <div className="flex items-center gap-2 mt-2">
+                <Badge variant="secondary">
+                  {selectedOrder.submittedBy === 'Group' ? (
+                    <><Users className="w-3 h-3 mr-1" /> Group Order</>
+                  ) : (
+                    selectedOrder.submittedBy
+                  )}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(selectedOrder.createdAt).toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}
+                </span>
+              </div>
+            )}
+          </DialogHeader>
+
+          {selectedOrder && (
+            <>
+              {/* Status Section */}
+              <div className="px-6 py-4 bg-muted/30 border-b shrink-0">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">{getStatusLabel(selectedOrder.status)}</span>
+                    <span className="text-primary font-medium">{getStatusProgress(selectedOrder.status)}%</span>
+                  </div>
+                  <Progress value={getStatusProgress(selectedOrder.status)} className="h-2" />
+                </div>
+              </div>
+
+              {/* Items List - Scrollable */}
+              <div className="flex-1 overflow-y-auto px-6 py-4">
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">
+                  {selectedOrder.items.length} {selectedOrder.items.length === 1 ? 'Item' : 'Items'}
+                </h4>
+                <div className="space-y-3">
+                  {selectedOrder.items.map((item) => (
+                    <div 
+                      key={`${item.id}-${item.addedById}`} 
+                      className="flex items-center gap-4 p-3 bg-muted/50 rounded-xl"
+                    >
+                      {item.image && (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-16 h-16 object-cover rounded-lg"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{item.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.quantity} × {formatPrice(item.price)}
+                        </p>
+                        {item.addedBy && item.addedBy !== 'Unknown' && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Added by {item.addedBy}
+                          </p>
+                        )}
+                      </div>
+                      <span className="font-semibold text-primary">
+                        {formatPrice(item.price * item.quantity)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Total Footer */}
+              <div className="px-6 py-4 border-t bg-background shrink-0 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">Order Total</span>
+                  <span className="text-xl font-bold text-primary">
+                    {formatPrice(selectedOrder.totalAmount)}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </Sheet>
   );
 }
