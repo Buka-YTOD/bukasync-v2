@@ -758,6 +758,15 @@ export function useRealtimeGroupSession(tableNumber: number) {
             quantity: 1,
           });
       }
+
+      // Reset ready status if user was ready
+      if (currentUser.isReady) {
+        await client
+          .from('session_members')
+          .update({ is_ready: false })
+          .eq('id', currentUser.id);
+        setCurrentUser((prev) => prev ? { ...prev, isReady: false } : null);
+      }
     } catch (error) {
       console.error('Error adding item:', error);
     }
@@ -773,6 +782,11 @@ export function useRealtimeGroupSession(tableNumber: number) {
     setSharedCart((prev) => prev.filter(
       (item) => !(item.id === itemId && item.addedById === addedById)
     ));
+
+    // Optimistically reset ready status
+    if (currentUser.isReady) {
+      setCurrentUser((prev) => prev ? { ...prev, isReady: false } : null);
+    }
 
     try {
       // Find the cart item by menu_item_id and member_id
@@ -798,6 +812,14 @@ export function useRealtimeGroupSession(tableNumber: number) {
         if (deleteError) {
           console.error('Error deleting cart item:', deleteError);
         }
+      }
+
+      // Reset ready status if user was ready
+      if (currentUser.isReady) {
+        await client
+          .from('session_members')
+          .update({ is_ready: false })
+          .eq('id', currentUser.id);
       }
     } catch (error) {
       console.error('Error removing item:', error);
@@ -830,6 +852,15 @@ export function useRealtimeGroupSession(tableNumber: number) {
             .update({ quantity })
             .eq('id', cartItem.id);
         }
+      }
+
+      // Reset ready status if user was ready
+      if (currentUser.isReady) {
+        await client
+          .from('session_members')
+          .update({ is_ready: false })
+          .eq('id', currentUser.id);
+        setCurrentUser((prev) => prev ? { ...prev, isReady: false } : null);
       }
     } catch (error) {
       console.error('Error updating quantity:', error);
