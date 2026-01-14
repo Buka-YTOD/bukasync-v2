@@ -1,10 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, ChefHat, CheckCircle2, UtensilsCrossed, RefreshCw, Users } from 'lucide-react';
+import { 
+  Clock, ChefHat, CheckCircle2, UtensilsCrossed, RefreshCw, Users, 
+  LayoutGrid, TableIcon, Trash2, Volume2, VolumeX 
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { CartItem } from '@/types/menu';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from '@/components/ui/table';
+import { playNewOrderSound, playNewUserSound } from '@/lib/notificationSounds';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Order {
   id: string;
@@ -64,6 +87,13 @@ const statusConfig = {
 export function OrdersPanel() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
+  
+  const previousOrderCount = useRef(0);
+  const previousMemberCounts = useRef<Record<string, number>>({});
+  const isInitialLoad = useRef(true);
 
   const fetchOrders = async () => {
     try {
@@ -93,11 +123,21 @@ export function OrdersPanel() {
         };
       });
 
+      // Play sound for new orders (not on initial load)
+      if (!isInitialLoad.current && soundEnabled && mappedOrders.length > previousOrderCount.current) {
+        playNewOrderSound();
+        toast.success('New order received!', { 
+          description: `Table ${mappedOrders[0]?.tableNumber}` 
+        });
+      }
+      
+      previousOrderCount.current = mappedOrders.length;
       setOrders(mappedOrders);
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {
       setIsLoading(false);
+      isInitialLoad.current = false;
     }
   };
 
@@ -118,8 +158,8 @@ export function OrdersPanel() {
   useEffect(() => {
     fetchOrders();
 
-    // Subscribe to realtime updates
-    const channel = supabase
+    // Subscribe to realtime updates for orders
+    const ordersChannel = supabase
       .channel('orders-dashboard')
       .on(
         'postgres_changes',
@@ -128,16 +168,43 @@ export function OrdersPanel() {
           schema: 'public',
           table: 'orders',
         },
-        () => {
-          fetchOrders();
+        (payload) => {
+          // Handle DELETE events optimistically
+          if (payload.eventType === 'DELETE') {
+            setOrders((prev) => prev.filter((order) => order.id !== payload.old.id));
+          } else {
+            fetchOrders();
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to new session members
+    const membersChannel = supabase
+      .channel('members-dashboard')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'session_members',
+        },
+        (payload) => {
+          if (!isInitialLoad.current && soundEnabled) {
+            playNewUserSound();
+            toast.info('New guest joined!', { 
+              description: `${payload.new.name} joined a session` 
+            });
+          }
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(membersChannel);
     };
-  }, []);
+  }, [soundEnabled]);
 
   const updateOrderStatus = async (orderId: string, newStatus: Order['status']) => {
     try {
@@ -157,6 +224,30 @@ export function OrdersPanel() {
     }
   };
 
+  const deleteOrder = async (orderId: string) => {
+    try {
+      // Optimistic update - remove immediately
+      setOrders((prev) => prev.filter((order) => order.id !== orderId));
+      
+      const { error } = await supabase
+        .from('orders')
+        .delete()
+        .eq('id', orderId);
+
+      if (error) {
+        // Revert on error
+        fetchOrders();
+        toast.error('Failed to delete order');
+        throw error;
+      }
+      
+      toast.success('Order deleted');
+    } catch (error) {
+      console.error('Error deleting order:', error);
+    }
+    setOrderToDelete(null);
+  };
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
@@ -174,7 +265,7 @@ export function OrdersPanel() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative pb-20">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-display text-2xl font-bold text-foreground">
@@ -184,10 +275,26 @@ export function OrdersPanel() {
             {orders.length} active orders
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchOrders}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
+        
+        {/* View toggle buttons */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant={viewMode === 'grid' ? 'default' : 'outline'}
+            size="icon"
+            onClick={() => setViewMode('grid')}
+            title="Grid view"
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </Button>
+          <Button
+            variant={viewMode === 'table' ? 'default' : 'outline'}
+            size="icon"
+            onClick={() => setViewMode('table')}
+            title="Table view"
+          >
+            <TableIcon className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
       {orders.length === 0 ? (
@@ -196,7 +303,7 @@ export function OrdersPanel() {
           <h3 className="font-semibold text-lg text-foreground">No active orders</h3>
           <p className="text-muted-foreground">Orders will appear here when guests submit them</p>
         </div>
-      ) : (
+      ) : viewMode === 'grid' ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <AnimatePresence mode="popLayout">
             {orders.map((order) => {
@@ -231,6 +338,14 @@ export function OrdersPanel() {
                         {order.submittedBy} • {order.createdAt}
                       </p>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => setOrderToDelete(order.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
 
                   <div className="space-y-2 mb-4">
@@ -270,7 +385,133 @@ export function OrdersPanel() {
             })}
           </AnimatePresence>
         </div>
+      ) : (
+        <div className="bg-card rounded-xl border border-border shadow-soft overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Table</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Guest</TableHead>
+                <TableHead>Items</TableHead>
+                <TableHead>Total</TableHead>
+                <TableHead>Time</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <AnimatePresence mode="popLayout">
+                {orders.map((order) => {
+                  const config = statusConfig[order.status];
+                  const StatusIcon = config.icon;
+
+                  return (
+                    <motion.tr
+                      key={order.id}
+                      layout
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="border-b transition-colors hover:bg-muted/50"
+                    >
+                      <TableCell className="font-medium">
+                        Table {order.tableNumber}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={config.color}>
+                          <StatusIcon className="w-3 h-3 mr-1" />
+                          {config.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{order.submittedBy}</TableCell>
+                      <TableCell className="max-w-[200px]">
+                        <span className="text-sm truncate block">
+                          {order.items.map(i => `${i.quantity}× ${i.name}`).join(', ')}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-semibold">
+                        {formatPrice(order.totalAmount)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {order.createdAt}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {config.nextStatus && (
+                            <Button
+                              size="sm"
+                              variant={order.status === 'received' ? 'default' : 'success'}
+                              onClick={() =>
+                                updateOrderStatus(order.id, config.nextStatus!)
+                              }
+                            >
+                              {config.nextLabel}
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => setOrderToDelete(order.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </motion.tr>
+                  );
+                })}
+              </AnimatePresence>
+            </TableBody>
+          </Table>
+        </div>
       )}
+
+      {/* Floating Action Buttons */}
+      <div className="fixed bottom-6 right-6 flex items-center gap-3 z-50">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setSoundEnabled(!soundEnabled)}
+          className="h-12 w-12 rounded-full shadow-lg bg-card"
+          title={soundEnabled ? 'Mute notifications' : 'Enable notifications'}
+        >
+          {soundEnabled ? (
+            <Volume2 className="w-5 h-5" />
+          ) : (
+            <VolumeX className="w-5 h-5" />
+          )}
+        </Button>
+        <Button
+          size="icon"
+          onClick={fetchOrders}
+          className="h-12 w-12 rounded-full shadow-lg"
+          title="Refresh orders"
+        >
+          <RefreshCw className="w-5 h-5" />
+        </Button>
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!orderToDelete} onOpenChange={() => setOrderToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The order will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => orderToDelete && deleteOrder(orderToDelete)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
