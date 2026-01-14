@@ -35,7 +35,9 @@ export function GroupMembersBar({ members, currentUserId }: GroupMembersBarProps
                   className="relative"
                 >
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold border-2 border-background shadow-sm"
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold border-2 shadow-sm ${
+                      member.isReady ? 'border-success' : 'border-background'
+                    }`}
                     style={{ backgroundColor: member.color }}
                   >
                     {member.name.charAt(0).toUpperCase()}
@@ -49,9 +51,9 @@ export function GroupMembersBar({ members, currentUserId }: GroupMembersBarProps
                     <motion.div
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      className="absolute -top-1 -right-1 w-4 h-4 bg-success rounded-full flex items-center justify-center"
+                      className="absolute -top-1 -right-1 w-4 h-4 bg-success rounded-full flex items-center justify-center border border-background"
                     >
-                      <Check className="w-2.5 h-2.5 text-white" />
+                      <Check className="w-2.5 h-2.5 text-success-foreground" />
                     </motion.div>
                   )}
                 </motion.div>
