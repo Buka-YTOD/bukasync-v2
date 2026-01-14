@@ -97,7 +97,7 @@ export function ServiceButtons({ tableNumber }: ServiceButtonsProps) {
           size="iconLg"
           onClick={() => setIsOpen(!isOpen)}
           className={`shadow-lg transition-colors ${
-            isOpen ? 'bg-muted text-foreground' : 'bg-primary text-primary-foreground'
+            isOpen ? 'bg-muted text-foreground' : 'bg-secondary text-secondary-foreground'
           }`}
         >
           {isOpen ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
