@@ -192,7 +192,7 @@ export function useRealtimeGroupSession(tableNumber: number) {
             const [membersRes, cartRes, ordersRes] = await Promise.all([
               client.from('session_members').select('*').eq('session_id', storedMember.sessionId).order('joined_at', { ascending: true }),
               client.from('cart_items').select('*, session_members(name)').eq('session_id', storedMember.sessionId),
-              client.from('orders').select('*').eq('session_id', storedMember.sessionId).order('created_at', { ascending: true }),
+              client.from('orders').select('*').eq('session_id', storedMember.sessionId).order('created_at', { ascending: false }),
             ]);
 
             setSessionId(storedMember.sessionId);
@@ -294,7 +294,7 @@ export function useRealtimeGroupSession(tableNumber: number) {
       const [membersResult, cartResult, ordersResult] = await Promise.all([
         client.from('session_members').select('*').eq('session_id', existingSession.id).order('joined_at', { ascending: true }),
         client.from('cart_items').select('*, session_members(name)').eq('session_id', existingSession.id),
-        client.from('orders').select('*').eq('session_id', existingSession.id).order('created_at', { ascending: true }),
+        client.from('orders').select('*').eq('session_id', existingSession.id).order('created_at', { ascending: false }),
       ]);
 
       // Save member identity to localStorage
@@ -472,7 +472,7 @@ export function useRealtimeGroupSession(tableNumber: number) {
             .from('orders')
             .select('*')
             .eq('session_id', sessionId)
-            .order('created_at', { ascending: true });
+            .order('created_at', { ascending: false });
           
           if (data) {
             setSubmittedOrders(data.map((o) => mapOrder(o as unknown as DbOrder)));
@@ -611,7 +611,7 @@ export function useRealtimeGroupSession(tableNumber: number) {
       const [membersResult, cartResult, ordersResult] = await Promise.all([
         client.from('session_members').select('*').eq('session_id', session.id).order('joined_at', { ascending: true }),
         client.from('cart_items').select('*, session_members(name)').eq('session_id', session.id),
-        client.from('orders').select('*').eq('session_id', session.id).order('created_at', { ascending: true }),
+        client.from('orders').select('*').eq('session_id', session.id).order('created_at', { ascending: false }),
       ]);
 
       // Save member identity to localStorage
