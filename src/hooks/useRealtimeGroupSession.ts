@@ -346,126 +346,79 @@ export function useRealtimeGroupSession(tableNumber: number) {
     
     const client = getClient();
 
-    // Subscribe to members changes
+    // Helper function to refetch and update members
+    const refetchMembers = async () => {
+      const { data } = await client
+        .from('session_members')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('joined_at', { ascending: true });
+      
+      if (data) {
+        const newMembers = data.map((m) => ({
+          id: m.id,
+          name: m.name,
+          color: m.color,
+          isReady: m.is_ready,
+          joinedAt: new Date(m.joined_at),
+        }));
+        prevMembersRef.current = newMembers;
+        setMembers(newMembers);
+      }
+    };
+
+    // Subscribe to members changes - listen to all events without filter for reliability
     const membersChannel = supabase
       .channel(`members-${sessionId}`)
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'session_members',
-          filter: `session_id=eq.${sessionId}`,
         },
         async (payload) => {
-          // Play sound and show toast when a new user joins (not the current user)
-          const newMember = payload.new as { id: string; name: string };
-          if (currentUser && newMember.id !== currentUser.id) {
-            playNewUserSound();
-            toast({
-              title: "New guest joined! 🎉",
-              description: `${newMember.name} has joined your table`,
-            });
+          const newRecord = payload.new as { id?: string; name?: string; is_ready?: boolean; session_id?: string } | null;
+          const oldRecord = payload.old as { id?: string; is_ready?: boolean; session_id?: string } | null;
+          
+          // Only process events for our session
+          const eventSessionId = newRecord?.session_id || oldRecord?.session_id;
+          if (eventSessionId !== sessionId) return;
+
+          // Handle notifications for INSERT
+          if (payload.eventType === 'INSERT' && newRecord) {
+            if (currentUser && newRecord.id !== currentUser.id) {
+              playNewUserSound();
+              toast({
+                title: "New guest joined! 🎉",
+                description: `${newRecord.name} has joined your table`,
+              });
+            }
+          }
+
+          // Handle notifications for UPDATE (ready status change)
+          if (payload.eventType === 'UPDATE' && newRecord && oldRecord) {
+            if (
+              currentUser &&
+              newRecord.id !== currentUser.id &&
+              newRecord.is_ready === true &&
+              oldRecord.is_ready === false
+            ) {
+              playNewOrderSound();
+              toast({
+                title: "Guest is ready! ✅",
+                description: `${newRecord.name} has marked their order as ready`,
+              });
+            }
           }
           
-          // Refetch members
-          const { data } = await client
-            .from('session_members')
-            .select('*')
-            .eq('session_id', sessionId)
-            .order('joined_at', { ascending: true });
-          
-          if (data) {
-            const newMembers = data.map((m) => ({
-              id: m.id,
-              name: m.name,
-              color: m.color,
-              isReady: m.is_ready,
-              joinedAt: new Date(m.joined_at),
-            }));
-            prevMembersRef.current = newMembers;
-            setMembers(newMembers);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'session_members',
-          filter: `session_id=eq.${sessionId}`,
-        },
-        async (payload) => {
-          const updatedMember = payload.new as { id: string; name: string; is_ready: boolean };
-          const oldMember = payload.old as { id: string; is_ready: boolean };
-          
-          // Play sound and show toast when another user marks as ready (not the current user)
-          if (
-            currentUser &&
-            updatedMember.id !== currentUser.id &&
-            updatedMember.is_ready === true &&
-            oldMember.is_ready === false
-          ) {
-            playNewOrderSound();
-            toast({
-              title: "Guest is ready! ✅",
-              description: `${updatedMember.name} has marked their order as ready`,
-            });
-          }
-          
-          // Refetch members
-          const { data } = await client
-            .from('session_members')
-            .select('*')
-            .eq('session_id', sessionId)
-            .order('joined_at', { ascending: true });
-          
-          if (data) {
-            const newMembers = data.map((m) => ({
-              id: m.id,
-              name: m.name,
-              color: m.color,
-              isReady: m.is_ready,
-              joinedAt: new Date(m.joined_at),
-            }));
-            prevMembersRef.current = newMembers;
-            setMembers(newMembers);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'session_members',
-          filter: `session_id=eq.${sessionId}`,
-        },
-        async () => {
-          // Refetch members on delete
-          const { data } = await client
-            .from('session_members')
-            .select('*')
-            .eq('session_id', sessionId)
-            .order('joined_at', { ascending: true });
-          
-          if (data) {
-            const newMembers = data.map((m) => ({
-              id: m.id,
-              name: m.name,
-              color: m.color,
-              isReady: m.is_ready,
-              joinedAt: new Date(m.joined_at),
-            }));
-            prevMembersRef.current = newMembers;
-            setMembers(newMembers);
-          }
+          // Refetch members for any change
+          await refetchMembers();
         }
       )
       .subscribe();
 
-    // Subscribe to cart changes
+    // Subscribe to cart changes - no filter for reliability
     const cartChannel = supabase
       .channel(`cart-${sessionId}`)
       .on(
@@ -474,9 +427,15 @@ export function useRealtimeGroupSession(tableNumber: number) {
           event: '*',
           schema: 'public',
           table: 'cart_items',
-          filter: `session_id=eq.${sessionId}`,
         },
-        async () => {
+        async (payload) => {
+          const newRecord = payload.new as { session_id?: string } | null;
+          const oldRecord = payload.old as { session_id?: string } | null;
+          
+          // Only process events for our session
+          const eventSessionId = newRecord?.session_id || oldRecord?.session_id;
+          if (eventSessionId !== sessionId) return;
+
           // Refetch cart on any change using token client
           const { data: cartData } = await client
             .from('cart_items')
@@ -490,7 +449,7 @@ export function useRealtimeGroupSession(tableNumber: number) {
       )
       .subscribe();
 
-    // Subscribe to orders changes
+    // Subscribe to orders changes - no filter for reliability
     const ordersChannel = supabase
       .channel(`orders-${sessionId}`)
       .on(
@@ -499,9 +458,15 @@ export function useRealtimeGroupSession(tableNumber: number) {
           event: '*',
           schema: 'public',
           table: 'orders',
-          filter: `session_id=eq.${sessionId}`,
         },
-        async () => {
+        async (payload) => {
+          const newRecord = payload.new as { session_id?: string } | null;
+          const oldRecord = payload.old as { session_id?: string } | null;
+          
+          // Only process events for our session
+          const eventSessionId = newRecord?.session_id || oldRecord?.session_id;
+          if (eventSessionId !== sessionId) return;
+
           // Refetch orders on any change using token client
           const { data } = await client
             .from('orders')
