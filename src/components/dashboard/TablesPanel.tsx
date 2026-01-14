@@ -29,8 +29,8 @@ export function TablesPanel() {
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
   const [newTableNumber, setNewTableNumber] = useState('');
   
-  // Get base URL for QR codes
-  const baseUrl = window.location.origin;
+  // Use published URL for QR codes
+  const baseUrl = 'https://bukasync-v2.lovable.app';
 
   const fetchActiveSessions = async () => {
     try {
