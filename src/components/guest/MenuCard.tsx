@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Plus, Flame } from 'lucide-react';
+import { Plus, Flame, AlertTriangle, ChevronRight } from 'lucide-react';
 import { MenuItem } from '@/types/menu';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,10 +7,11 @@ import { Badge } from '@/components/ui/badge';
 interface MenuCardProps {
   item: MenuItem;
   onAddToCart: (item: MenuItem) => void;
+  onViewDetails: (item: MenuItem) => void;
   currentUserColor?: string;
 }
 
-export function MenuCard({ item, onAddToCart, currentUserColor }: MenuCardProps) {
+export function MenuCard({ item, onAddToCart, onViewDetails, currentUserColor }: MenuCardProps) {
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
@@ -19,15 +20,19 @@ export function MenuCard({ item, onAddToCart, currentUserColor }: MenuCardProps)
     }).format(price);
   };
 
+  const hasAllergens = item.allergens && item.allergens.length > 0;
+  const hasCustomizations = item.customizationOptions && item.customizationOptions.length > 0;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -4 }}
       transition={{ duration: 0.3 }}
-      className="group relative bg-card rounded-xl overflow-hidden shadow-soft hover:shadow-medium transition-all duration-300"
+      className="group relative bg-card rounded-xl overflow-hidden shadow-soft hover:shadow-medium transition-all duration-300 cursor-pointer"
+      onClick={() => onViewDetails(item)}
     >
-      <div className="aspect-square overflow-hidden">
+      <div className="aspect-square overflow-hidden relative">
         <img
           src={item.image}
           alt={item.name}
@@ -38,6 +43,22 @@ export function MenuCard({ item, onAddToCart, currentUserColor }: MenuCardProps)
             <span className="text-background font-medium">Sold Out</span>
           </div>
         )}
+        
+        {/* Allergen indicator */}
+        {hasAllergens && (
+          <div className="absolute top-2 right-2">
+            <div className="bg-warning/90 text-warning-foreground rounded-full p-1.5">
+              <AlertTriangle className="w-3 h-3" />
+            </div>
+          </div>
+        )}
+
+        {/* View details hint on hover */}
+        <div className="absolute inset-0 bg-gradient-to-t from-foreground/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-4">
+          <span className="text-background text-sm font-medium flex items-center gap-1">
+            View Details <ChevronRight className="w-4 h-4" />
+          </span>
+        </div>
       </div>
 
       <div className="p-4 space-y-2">
@@ -60,6 +81,11 @@ export function MenuCard({ item, onAddToCart, currentUserColor }: MenuCardProps)
               {tag}
             </Badge>
           ))}
+          {hasCustomizations && (
+            <Badge variant="outline" className="text-xs">
+              Customizable
+            </Badge>
+          )}
         </div>
 
         <div className="flex items-center justify-between pt-2">
@@ -68,7 +94,10 @@ export function MenuCard({ item, onAddToCart, currentUserColor }: MenuCardProps)
           </span>
           <Button
             size="icon"
-            onClick={() => onAddToCart(item)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToCart(item);
+            }}
             disabled={!item.available}
             className="rounded-full"
             style={currentUserColor ? { 

@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { GuestHeader } from '@/components/guest/GuestHeader';
 import { CategoryTabs } from '@/components/guest/CategoryTabs';
 import { MenuCard } from '@/components/guest/MenuCard';
+import { MenuItemDetailSheet } from '@/components/guest/MenuItemDetailSheet';
+import { AllergyFilter } from '@/components/guest/AllergyFilter';
 import { SharedCartSheet } from '@/components/guest/SharedCartSheet';
 import { ServiceButtons } from '@/components/guest/ServiceButtons';
 import { JoinSessionModal } from '@/components/guest/JoinSessionModal';
@@ -11,6 +13,7 @@ import { GroupMembersBar } from '@/components/guest/GroupMembersBar';
 import { PaymentSheet } from '@/components/guest/PaymentSheet';
 import { useRealtimeGroupSession } from '@/hooks/useRealtimeGroupSession';
 import { menuItems, categories } from '@/data/menuData';
+import { MenuItem, Allergen, SelectedCustomization } from '@/types/menu';
 import { toast } from 'sonner';
 
 const RESTAURANT_NAME = "Mama's Kitchen";
@@ -20,12 +23,24 @@ export default function GuestMenu() {
   const tableNumber = parseInt(searchParams.get('table') || '7', 10);
   
   const [activeCategory, setActiveCategory] = useState('All');
+  const [selectedAllergens, setSelectedAllergens] = useState<Allergen[]>([]);
+  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
+  
   const session = useRealtimeGroupSession(tableNumber);
 
-  const filteredItems =
-    activeCategory === 'All'
-      ? menuItems
-      : menuItems.filter((item) => item.category === activeCategory);
+  // Filter items by category and allergens
+  const filteredItems = menuItems
+    .filter((item) => activeCategory === 'All' || item.category === activeCategory)
+    .filter((item) => {
+      // If no allergens selected, show all items
+      if (selectedAllergens.length === 0) return true;
+      // Hide items that contain any of the selected allergens
+      const itemAllergens = item.allergens || [];
+      return !selectedAllergens.some((allergen) =>
+        itemAllergens.includes(allergen)
+      );
+    });
 
   const handleCreateSession = async (name: string) => {
     try {
@@ -84,6 +99,53 @@ export default function GuestMenu() {
     }
   };
 
+  const handleViewDetails = (item: MenuItem) => {
+    setSelectedItem(item);
+    setIsDetailSheetOpen(true);
+  };
+
+  const handleAddToCartFromDetail = (
+    item: MenuItem,
+    quantity: number,
+    comment?: string,
+    customizations?: SelectedCustomization[]
+  ) => {
+    // Add to cart (customizations stored in toast for now - full DB support coming)
+    for (let i = 0; i < quantity; i++) {
+      session.addItem(item);
+    }
+    
+    const customizationText = customizations?.length
+      ? ` (${customizations.map((c) => c.selectedLabel).join(', ')})`
+      : '';
+    
+    toast.success(`Added ${quantity}x ${item.name}${customizationText}`, {
+      description: comment
+        ? `Note: "${comment}"`
+        : 'Your friends can see this in the shared cart',
+    });
+  };
+
+  const handleQuickAdd = (item: MenuItem) => {
+    // If item has required customizations, open detail sheet
+    const hasRequiredCustomizations = item.customizationOptions?.some(
+      (opt) => opt.required
+    );
+    
+    if (hasRequiredCustomizations) {
+      handleViewDetails(item);
+      toast.info(`${item.name} has options`, {
+        description: 'Please customize your order',
+      });
+      return;
+    }
+
+    session.addItem(item);
+    toast.success(`Added ${item.name}`, {
+      description: 'Your friends can see this in the shared cart',
+    });
+  };
+
   return (
     <div className="min-h-[100dvh] bg-background pb-36">
       {/* Join Session Modal */}
@@ -124,12 +186,26 @@ export default function GuestMenu() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
+          className="space-y-4"
         >
           <CategoryTabs
             categories={categories}
             activeCategory={activeCategory}
             onCategoryChange={setActiveCategory}
           />
+          
+          {/* Allergy Filter */}
+          <div className="flex items-center justify-between">
+            <AllergyFilter
+              selectedAllergens={selectedAllergens}
+              onAllergensChange={setSelectedAllergens}
+            />
+            {selectedAllergens.length > 0 && (
+              <span className="text-sm text-muted-foreground">
+                {filteredItems.length} items shown
+              </span>
+            )}
+          </div>
         </motion.div>
 
         <motion.div
@@ -148,19 +224,39 @@ export default function GuestMenu() {
               <MenuCard
                 item={item}
                 currentUserColor={session.currentUser?.color}
-                onAddToCart={(menuItem) => {
-                  session.addItem(menuItem);
-                  toast.success(`Added ${menuItem.name}`, {
-                    description: 'Your friends can see this in the shared cart',
-                  });
-                }}
+                onViewDetails={handleViewDetails}
+                onAddToCart={handleQuickAdd}
               />
             </motion.div>
           ))}
         </motion.div>
+
+        {filteredItems.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-12"
+          >
+            <p className="text-muted-foreground">
+              No items match your filters. Try removing some allergen filters.
+            </p>
+          </motion.div>
+        )}
       </main>
 
       <ServiceButtons tableNumber={tableNumber} />
+
+      {/* Menu Item Detail Sheet */}
+      <MenuItemDetailSheet
+        item={selectedItem}
+        isOpen={isDetailSheetOpen}
+        onClose={() => {
+          setIsDetailSheetOpen(false);
+          setSelectedItem(null);
+        }}
+        onAddToCart={handleAddToCartFromDetail}
+        currentUserColor={session.currentUser?.color}
+      />
 
       {session.isJoined && (session.totalItems > 0 || session.submittedOrders.length > 0) && (
         <SharedCartSheet
