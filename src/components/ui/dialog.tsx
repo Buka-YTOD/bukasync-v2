@@ -1,10 +1,38 @@
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
+import { useLocation } from "react-router-dom";
 
 import { cn } from "@/lib/utils";
 
-const Dialog = DialogPrimitive.Root;
+interface DialogProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Root> {
+  /** Close the dialog when navigation occurs. Defaults to true. */
+  closeOnNavigation?: boolean;
+}
+
+const Dialog = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Root>,
+  DialogProps
+>(({ closeOnNavigation = true, open, onOpenChange, ...props }, ref) => {
+  const location = useLocation();
+  const prevLocationRef = React.useRef(location.pathname + location.search);
+
+  React.useEffect(() => {
+    const currentLocation = location.pathname + location.search;
+    if (
+      closeOnNavigation &&
+      open &&
+      onOpenChange &&
+      prevLocationRef.current !== currentLocation
+    ) {
+      onOpenChange(false);
+    }
+    prevLocationRef.current = currentLocation;
+  }, [location.pathname, location.search, closeOnNavigation, open, onOpenChange]);
+
+  return <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} {...props} />;
+});
+Dialog.displayName = "Dialog";
 
 const DialogTrigger = DialogPrimitive.Trigger;
 

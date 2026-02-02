@@ -2,10 +2,38 @@ import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
 import * as React from "react";
+import { useLocation } from "react-router-dom";
 
 import { cn } from "@/lib/utils";
 
-const Sheet = SheetPrimitive.Root;
+interface SheetProps extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Root> {
+  /** Close the sheet when navigation occurs. Defaults to true. */
+  closeOnNavigation?: boolean;
+}
+
+const Sheet = React.forwardRef<
+  React.ElementRef<typeof SheetPrimitive.Root>,
+  SheetProps
+>(({ closeOnNavigation = true, open, onOpenChange, ...props }, ref) => {
+  const location = useLocation();
+  const prevLocationRef = React.useRef(location.pathname + location.search);
+
+  React.useEffect(() => {
+    const currentLocation = location.pathname + location.search;
+    if (
+      closeOnNavigation &&
+      open &&
+      onOpenChange &&
+      prevLocationRef.current !== currentLocation
+    ) {
+      onOpenChange(false);
+    }
+    prevLocationRef.current = currentLocation;
+  }, [location.pathname, location.search, closeOnNavigation, open, onOpenChange]);
+
+  return <SheetPrimitive.Root open={open} onOpenChange={onOpenChange} {...props} />;
+});
+Sheet.displayName = "Sheet";
 
 const SheetTrigger = SheetPrimitive.Trigger;
 
