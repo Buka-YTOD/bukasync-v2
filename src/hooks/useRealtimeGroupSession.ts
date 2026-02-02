@@ -460,12 +460,33 @@ export function useRealtimeGroupSession(tableNumber: number) {
           table: 'orders',
         },
         async (payload) => {
-          const newRecord = payload.new as { session_id?: string } | null;
-          const oldRecord = payload.old as { session_id?: string } | null;
+          const newRecord = payload.new as { session_id?: string; status?: string; submitted_by_name?: string } | null;
+          const oldRecord = payload.old as { session_id?: string; status?: string } | null;
           
           // Only process events for our session
           const eventSessionId = newRecord?.session_id || oldRecord?.session_id;
           if (eventSessionId !== sessionId) return;
+
+          // Notify guest when order status is updated by admin
+          if (payload.eventType === 'UPDATE' && newRecord && oldRecord) {
+            if (newRecord.status !== oldRecord.status) {
+              playNewOrderSound();
+              
+              const statusLabels: Record<string, string> = {
+                received: 'received',
+                preparing: 'being prepared 👨‍🍳',
+                ready: 'ready for pickup! 🎉',
+                served: 'served! Enjoy! 🍽️',
+              };
+              
+              const statusLabel = statusLabels[newRecord.status || ''] || newRecord.status;
+              
+              toast({
+                title: "Order Update! 📢",
+                description: `Your order is now ${statusLabel}`,
+              });
+            }
+          }
 
           // Refetch orders on any change using token client
           const { data } = await client

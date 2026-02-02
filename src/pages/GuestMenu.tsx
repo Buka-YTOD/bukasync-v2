@@ -165,6 +165,7 @@ export default function GuestMenu() {
         restaurantName={RESTAURANT_NAME} 
         tableNumber={tableNumber} 
         sessionCode={session.sessionCode}
+        submittedOrders={session.submittedOrders}
       />
 
       <main className="container mx-auto px-4 py-6">
