@@ -76,6 +76,9 @@ export type Database = {
           session_code: string
           status: string
           table_number: number
+          terminated_at: string | null
+          terminated_by: string | null
+          termination_comment: string | null
         }
         Insert: {
           completed_at?: string | null
@@ -84,6 +87,9 @@ export type Database = {
           session_code: string
           status?: string
           table_number: number
+          terminated_at?: string | null
+          terminated_by?: string | null
+          termination_comment?: string | null
         }
         Update: {
           completed_at?: string | null
@@ -92,6 +98,9 @@ export type Database = {
           session_code?: string
           status?: string
           table_number?: number
+          terminated_at?: string | null
+          terminated_by?: string | null
+          termination_comment?: string | null
         }
         Relationships: []
       }
