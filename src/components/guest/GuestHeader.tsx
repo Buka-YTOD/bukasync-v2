@@ -1,14 +1,17 @@
 import { motion } from 'framer-motion';
 import { MapPin, Users, Copy } from 'lucide-react';
 import { toast } from 'sonner';
+import { OrderNotifications } from './OrderNotifications';
+import { GroupOrder } from '@/types/menu';
 
 interface GuestHeaderProps {
   restaurantName: string;
   tableNumber: number;
   sessionCode?: string | null;
+  submittedOrders?: GroupOrder[];
 }
 
-export function GuestHeader({ restaurantName, tableNumber, sessionCode }: GuestHeaderProps) {
+export function GuestHeader({ restaurantName, tableNumber, sessionCode, submittedOrders = [] }: GuestHeaderProps) {
   const copyCode = () => {
     if (sessionCode) {
       navigator.clipboard.writeText(sessionCode);
@@ -39,15 +42,20 @@ export function GuestHeader({ restaurantName, tableNumber, sessionCode }: GuestH
               </span>
             </div>
           </div>
-          {sessionCode && (
-            <button
-              onClick={copyCode}
-              className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors"
-            >
-              <span className="font-mono font-bold text-primary tracking-wider">{sessionCode}</span>
-              <Copy className="w-4 h-4 text-primary" />
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Order Notifications */}
+            <OrderNotifications orders={submittedOrders} />
+            
+            {sessionCode && (
+              <button
+                onClick={copyCode}
+                className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg hover:bg-primary/20 transition-colors"
+              >
+                <span className="font-mono font-bold text-primary tracking-wider">{sessionCode}</span>
+                <Copy className="w-4 h-4 text-primary" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </motion.header>
