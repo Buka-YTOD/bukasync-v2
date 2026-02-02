@@ -1,17 +1,31 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
-import { QrCode, Download, Users, Copy, ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { QrCode, Download, Users, Copy, ExternalLink, Plus, Trash2, XCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -28,6 +42,9 @@ export function TablesPanel() {
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
   const [newTableNumber, setNewTableNumber] = useState('');
+  const [terminateSession, setTerminateSession] = useState<ActiveSession | null>(null);
+  const [terminateComment, setTerminateComment] = useState('');
+  const [isTerminating, setIsTerminating] = useState(false);
   
   // Use published URL for QR codes
   const baseUrl = 'https://bukasync-v2.lovable.app';
@@ -153,8 +170,88 @@ export function TablesPanel() {
     toast.success(`Table ${tableNumber} removed`);
   };
 
+  const handleTerminateSession = async () => {
+    if (!terminateSession) return;
+    
+    setIsTerminating(true);
+    try {
+      const { error } = await supabase
+        .from('dining_sessions')
+        .update({
+          status: 'terminated',
+          terminated_at: new Date().toISOString(),
+          terminated_by: 'admin',
+          termination_comment: terminateComment.trim() || null,
+        })
+        .eq('id', terminateSession.id);
+
+      if (error) throw error;
+
+      toast.success(`Session terminated`, {
+        description: `Table ${terminateSession.tableNumber} session has been ended`,
+      });
+      
+      setTerminateSession(null);
+      setTerminateComment('');
+      fetchActiveSessions();
+    } catch (error) {
+      console.error('Error terminating session:', error);
+      toast.error('Failed to terminate session');
+    } finally {
+      setIsTerminating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Terminate Session Dialog */}
+      <AlertDialog open={!!terminateSession} onOpenChange={(open) => !open && setTerminateSession(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Terminate Session
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will end the active session for Table {terminateSession?.tableNumber}. 
+              All guests will be disconnected and their carts will be cleared.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="p-3 bg-muted rounded-lg text-sm">
+              <p><span className="font-medium">Session Code:</span> {terminateSession?.sessionCode}</p>
+              <p><span className="font-medium">Active Guests:</span> {terminateSession?.memberCount}</p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="terminate-comment">Reason for termination (optional)</Label>
+              <Textarea
+                id="terminate-comment"
+                placeholder="e.g., Table requested reset, Payment completed, etc."
+                value={terminateComment}
+                onChange={(e) => setTerminateComment(e.target.value)}
+                className="resize-none"
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setTerminateComment('')}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleTerminateSession}
+              disabled={isTerminating}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isTerminating ? 'Terminating...' : 'Terminate Session'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-display text-2xl font-bold text-foreground">
@@ -213,8 +310,21 @@ export function TablesPanel() {
 
               {session && (
                 <div className="mb-3 p-2 bg-success/10 rounded-lg">
-                  <p className="text-xs text-success font-medium">Active Session</p>
-                  <p className="font-mono text-sm font-bold text-success">{session.sessionCode}</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-success font-medium">Active Session</p>
+                      <p className="font-mono text-sm font-bold text-success">{session.sessionCode}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                      onClick={() => setTerminateSession(session)}
+                      title="Terminate Session"
+                    >
+                      <XCircle className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               )}
 
