@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   ArrowRight,
   Smartphone,
+  ShoppingBag,
   Zap,
   ShieldCheck
 } from 'lucide-react';
@@ -53,6 +54,12 @@ export default function LandingPage() {
           </Link>
 
           <div className="flex items-center gap-4">
+            <Link to="/shop">
+              <Button variant="ghost" className="gap-1.5">
+                <ShoppingBag className="w-4 h-4" />
+                Order Food
+              </Button>
+            </Link>
             <Link to="/menu">
               <Button variant="ghost">Demo Menu</Button>
             </Link>
