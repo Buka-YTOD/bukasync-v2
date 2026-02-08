@@ -152,6 +152,63 @@ export type Database = {
           },
         ]
       }
+      restaurants: {
+        Row: {
+          address: string
+          close_time: string
+          created_at: string
+          delivery_fee: number | null
+          description: string | null
+          estimated_delivery_mins: number | null
+          id: string
+          image_url: string | null
+          is_active: boolean
+          name: string
+          open_days: string[]
+          open_time: string
+          phone: string | null
+          rating: number | null
+          supports_dinein: boolean
+          supports_shop: boolean
+        }
+        Insert: {
+          address: string
+          close_time?: string
+          created_at?: string
+          delivery_fee?: number | null
+          description?: string | null
+          estimated_delivery_mins?: number | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          name: string
+          open_days?: string[]
+          open_time?: string
+          phone?: string | null
+          rating?: number | null
+          supports_dinein?: boolean
+          supports_shop?: boolean
+        }
+        Update: {
+          address?: string
+          close_time?: string
+          created_at?: string
+          delivery_fee?: number | null
+          description?: string | null
+          estimated_delivery_mins?: number | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          name?: string
+          open_days?: string[]
+          open_time?: string
+          phone?: string | null
+          rating?: number | null
+          supports_dinein?: boolean
+          supports_shop?: boolean
+        }
+        Relationships: []
+      }
       session_members: {
         Row: {
           color: string
@@ -186,6 +243,115 @@ export type Database = {
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "dining_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_menu_items: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          is_available: boolean
+          name: string
+          price: number
+          restaurant_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_available?: boolean
+          name: string
+          price: number
+          restaurant_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_available?: boolean
+          name?: string
+          price?: number
+          restaurant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_menu_items_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_orders: {
+        Row: {
+          created_at: string
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string
+          delivery_address: string | null
+          delivery_fee: number
+          fulfillment_type: string
+          id: string
+          items: Json
+          notes: string | null
+          payment_status: string
+          restaurant_id: string
+          status: string
+          subtotal: number
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_email?: string | null
+          customer_name: string
+          customer_phone: string
+          delivery_address?: string | null
+          delivery_fee?: number
+          fulfillment_type?: string
+          id?: string
+          items: Json
+          notes?: string | null
+          payment_status?: string
+          restaurant_id: string
+          status?: string
+          subtotal: number
+          total_amount: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string
+          delivery_address?: string | null
+          delivery_fee?: number
+          fulfillment_type?: string
+          id?: string
+          items?: Json
+          notes?: string | null
+          payment_status?: string
+          restaurant_id?: string
+          status?: string
+          subtotal?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_orders_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
             referencedColumns: ["id"]
           },
         ]
