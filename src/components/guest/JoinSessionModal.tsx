@@ -18,9 +18,11 @@ interface JoinSessionModalProps {
   isLoading?: boolean;
   checkingSession?: boolean;
   existingSession?: { id: string; code: string } | null;
+  isStaleSession?: boolean;
   onCreateSession: (name: string) => void;
   onJoinSession: (code: string, name: string) => void;
   onJoinExistingSession: (name: string) => void;
+  onReplaceStaleSession: (name: string) => void;
 }
 
 export function JoinSessionModal({
@@ -30,9 +32,11 @@ export function JoinSessionModal({
   isLoading = false,
   checkingSession = false,
   existingSession = null,
+  isStaleSession = false,
   onCreateSession,
   onJoinSession,
   onJoinExistingSession,
+  onReplaceStaleSession,
 }: JoinSessionModalProps) {
   const [name, setName] = useState('');
   const [sessionCode, setSessionCode] = useState('');
@@ -94,7 +98,108 @@ export function JoinSessionModal({
     );
   }
 
-  // If there's an existing session, show smart join UI
+  // If there's an existing STALE session, ask if user is part of it
+  if (existingSession && isStaleSession) {
+    return (
+      <Dialog open={isOpen}>
+        <DialogContent className="sm:max-w-md" hideCloseButton>
+          <DialogHeader className="text-center">
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="mx-auto mb-4 w-16 h-16 bg-accent/20 rounded-full flex items-center justify-center"
+            >
+              <Users className="w-8 h-8 text-accent-foreground" />
+            </motion.div>
+            <DialogTitle className="font-display text-2xl text-center">
+              Table {tableNumber}
+            </DialogTitle>
+          </DialogHeader>
+
+          <motion.div
+            initial={{ y: 10, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="space-y-4"
+          >
+            <p className="text-muted-foreground text-sm text-center">
+              There's a previous session at this table that's been inactive. Are you part of that group?
+            </p>
+
+            <div className="space-y-2">
+              <Input
+                type="text"
+                placeholder="Enter your name..."
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setError('');
+                }}
+                className="text-center text-lg h-12"
+                autoFocus
+                maxLength={20}
+                disabled={isLoading}
+              />
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-destructive text-sm text-center"
+                >
+                  {error}
+                </motion.p>
+              )}
+            </div>
+
+            <Button
+              type="button"
+              variant="hero"
+              size="xl"
+              className="w-full"
+              disabled={!name.trim() || isLoading}
+              onClick={(e) => { e.preventDefault(); if (validateName()) onJoinExistingSession(name.trim()); }}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Joining...
+                </>
+              ) : (
+                <>
+                  Yes, rejoin the session
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </>
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="xl"
+              className="w-full"
+              disabled={!name.trim() || isLoading}
+              onClick={(e) => { e.preventDefault(); if (validateName()) onReplaceStaleSession(name.trim()); }}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Starting...
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  No, start a new session
+                </>
+              )}
+            </Button>
+          </motion.div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // If there's an existing session (not stale), show smart join UI
   if (existingSession) {
     return (
       <Dialog open={isOpen}>

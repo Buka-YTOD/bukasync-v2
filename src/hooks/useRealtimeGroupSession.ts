@@ -126,6 +126,7 @@ export function useRealtimeGroupSession(tableNumber: number) {
   const [sessionComplete, setSessionComplete] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [existingSession, setExistingSession] = useState<{ id: string; code: string } | null>(null);
+  const [isStaleSession, setIsStaleSession] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [deviceToken, setDeviceToken] = useState<string | null>(null);
   
@@ -227,17 +228,38 @@ export function useRealtimeGroupSession(tableNumber: number) {
         }
 
         // No valid stored session, check for any active session on this table
-        const { data: session } = await supabase // Use base client for public session discovery
+        const { data: session } = await supabase
           .from('dining_sessions')
-          .select('id, session_code')
+          .select('id, session_code, created_at')
           .eq('table_number', tableNumber)
           .eq('status', 'active')
           .single();
 
         if (session) {
+          // Check if session is stale (no activity for 15+ minutes)
+          const STALE_THRESHOLD_MS = 15 * 60 * 1000;
+          
+          // Find the most recent activity timestamp across related tables
+          const [latestCart, latestOrder, latestMember] = await Promise.all([
+            supabase.from('cart_items').select('created_at').eq('session_id', session.id).order('created_at', { ascending: false }).limit(1),
+            supabase.from('orders').select('created_at').eq('session_id', session.id).order('created_at', { ascending: false }).limit(1),
+            supabase.from('session_members').select('joined_at').eq('session_id', session.id).order('joined_at', { ascending: false }).limit(1),
+          ]);
+
+          const timestamps = [
+            new Date(session.created_at).getTime(),
+            latestCart.data?.[0]?.created_at ? new Date(latestCart.data[0].created_at).getTime() : 0,
+            latestOrder.data?.[0]?.created_at ? new Date(latestOrder.data[0].created_at).getTime() : 0,
+            latestMember.data?.[0]?.joined_at ? new Date(latestMember.data[0].joined_at).getTime() : 0,
+          ];
+          const lastActivity = Math.max(...timestamps);
+          const isStale = Date.now() - lastActivity > STALE_THRESHOLD_MS;
+
           setExistingSession({ id: session.id, code: session.session_code });
+          setIsStaleSession(isStale);
         } else {
           setExistingSession(null);
+          setIsStaleSession(false);
         }
       } catch (error) {
         // No existing session found, that's fine
@@ -577,6 +599,23 @@ export function useRealtimeGroupSession(tableNumber: number) {
       setIsLoading(false);
     }
   }, [tableNumber, deviceToken, getClient]);
+
+  // Replace a stale session: complete the old one and create a new session
+  const replaceStaleSession = useCallback(async (name: string) => {
+    if (!existingSession) return;
+    
+    // Mark the old session as completed
+    await supabase
+      .from('dining_sessions')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('id', existingSession.id);
+
+    setExistingSession(null);
+    setIsStaleSession(false);
+
+    // Create a fresh session
+    return createSession(name);
+  }, [existingSession, createSession]);
 
   const joinSession = useCallback(async (code: string, name: string) => {
     if (!deviceToken) return;
@@ -1081,6 +1120,7 @@ export function useRealtimeGroupSession(tableNumber: number) {
     isLoading,
     checkingSession,
     existingSession,
+    isStaleSession,
     myItems,
     myTotal,
     groupTotal,
@@ -1092,6 +1132,7 @@ export function useRealtimeGroupSession(tableNumber: number) {
     createSession,
     joinSession,
     joinExistingSession,
+    replaceStaleSession,
     leaveSession,
     addItem,
     removeItem,

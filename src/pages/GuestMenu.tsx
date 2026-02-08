@@ -81,6 +81,21 @@ export default function GuestMenu() {
     }
   };
 
+  const handleReplaceStaleSession = async (name: string) => {
+    try {
+      const result = await session.replaceStaleSession(name);
+      if (result) {
+        toast.success(`Welcome, ${name}!`, {
+          description: `New session started! Code: ${result.code}`,
+        });
+      }
+    } catch (error) {
+      toast.error('Failed to start new session', {
+        description: 'Please try again.',
+      });
+    }
+  };
+
   const handleSubmitMyOrder = async () => {
     const order = await session.submitMyOrder();
     if (order) {
@@ -156,9 +171,11 @@ export default function GuestMenu() {
         isLoading={session.isLoading}
         checkingSession={session.checkingSession}
         existingSession={session.existingSession}
+        isStaleSession={session.isStaleSession}
         onCreateSession={handleCreateSession}
         onJoinSession={handleJoinSession}
         onJoinExistingSession={handleJoinExistingSession}
+        onReplaceStaleSession={handleReplaceStaleSession}
       />
 
       <GuestHeader 
