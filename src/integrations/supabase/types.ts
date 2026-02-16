@@ -68,6 +68,48 @@ export type Database = {
           },
         ]
       }
+      dine_in_menu_items: {
+        Row: {
+          allergens: string[] | null
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          is_available: boolean
+          name: string
+          price: number
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          allergens?: string[] | null
+          category: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_available?: boolean
+          name: string
+          price: number
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          allergens?: string[] | null
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_available?: boolean
+          name?: string
+          price?: number
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       dining_sessions: {
         Row: {
           completed_at: string | null
@@ -208,6 +250,50 @@ export type Database = {
           supports_shop?: boolean
         }
         Relationships: []
+      }
+      service_alerts: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          guest_name: string | null
+          id: string
+          resolved_at: string | null
+          session_id: string | null
+          status: string
+          table_number: number
+          type: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          guest_name?: string | null
+          id?: string
+          resolved_at?: string | null
+          session_id?: string | null
+          status?: string
+          table_number: number
+          type: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          guest_name?: string | null
+          id?: string
+          resolved_at?: string | null
+          session_id?: string | null
+          status?: string
+          table_number?: number
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_alerts_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "dining_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       session_members: {
         Row: {
