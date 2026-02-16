@@ -1,20 +1,43 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Lock, Mail, ChefHat } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 import heroImage from '@/assets/hero-restaurant.jpg';
 
 export default function DashboardLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { signIn, session } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Redirect if already logged in
+  if (session) {
+    navigate('/dashboard', { replace: true });
+    return null;
+  }
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Demo login - redirect to dashboard
-    window.location.href = '/dashboard';
+    if (!email.trim() || !password.trim()) {
+      toast({ title: 'Error', description: 'Please enter email and password', variant: 'destructive' });
+      return;
+    }
+    setIsLoading(true);
+    const { error } = await signIn(email, password);
+    setIsLoading(false);
+    if (error) {
+      toast({ title: 'Login Failed', description: error.message, variant: 'destructive' });
+    } else {
+      navigate('/dashboard', { replace: true });
+    }
   };
 
   return (
@@ -55,6 +78,7 @@ export default function DashboardLogin() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
+                  required
                 />
               </div>
             </div>
@@ -70,12 +94,13 @@ export default function DashboardLogin() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10"
+                  required
                 />
               </div>
             </div>
 
-            <Button type="submit" variant="hero" size="xl" className="w-full">
-              Sign In to Dashboard
+            <Button type="submit" variant="hero" size="xl" className="w-full" disabled={isLoading}>
+              {isLoading ? 'Signing in...' : 'Sign In to Dashboard'}
             </Button>
           </form>
 

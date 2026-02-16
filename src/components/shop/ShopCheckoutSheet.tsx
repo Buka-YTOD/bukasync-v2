@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { z } from 'zod';
 import {
   Truck, Store, Minus, Plus, Trash2, Check, CreditCard, Smartphone,
   ArrowLeft, MapPin, User, Phone, Mail, FileText
@@ -15,6 +16,17 @@ import {
 } from '@/components/ui/sheet';
 import { useToast } from '@/hooks/use-toast';
 import type { useShopCart } from '@/hooks/useShopCart';
+
+const orderDetailsSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(100, 'Name too long'),
+  phone: z.string().trim().min(1, 'Phone is required').max(20, 'Phone too long'),
+  email: z.string().trim().max(255, 'Email too long').refine(
+    (val) => !val || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
+    'Invalid email format'
+  ),
+  address: z.string().trim().max(500, 'Address too long'),
+  notes: z.string().trim().max(1000, 'Notes too long'),
+});
 
 type FulfillmentType = 'delivery' | 'pickup';
 type Step = 'cart' | 'details' | 'payment' | 'processing' | 'success';
@@ -42,6 +54,26 @@ export function ShopCheckoutSheet({ isOpen, onClose, cart, restaurant }: Props) 
 
   const deliveryFee = fulfillment === 'delivery' ? (restaurant.delivery_fee || 0) : 0;
   const total = cart.subtotal + deliveryFee;
+
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  const validateDetails = () => {
+    const result = orderDetailsSchema.safeParse({ name, phone, email, address, notes });
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) errors[err.path[0] as string] = err.message;
+      });
+      setValidationErrors(errors);
+      return false;
+    }
+    if (fulfillment === 'delivery' && !address.trim()) {
+      setValidationErrors({ address: 'Delivery address is required' });
+      return false;
+    }
+    setValidationErrors({});
+    return true;
+  };
 
   const canProceedToPayment = name.trim() && phone.trim() && (fulfillment === 'pickup' || address.trim());
 
@@ -186,31 +218,35 @@ export function ShopCheckoutSheet({ isOpen, onClose, cart, restaurant }: Props) 
                 <div className="space-y-3">
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5"><User className="w-3.5 h-3.5" /> Name *</label>
-                    <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="rounded-xl" />
+                    <Input value={name} onChange={(e) => setName(e.target.value.slice(0, 100))} placeholder="Your name" className="rounded-xl" maxLength={100} />
+                    {validationErrors.name && <p className="text-xs text-destructive">{validationErrors.name}</p>}
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> Phone *</label>
-                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="08012345678" className="rounded-xl" />
+                    <Input value={phone} onChange={(e) => setPhone(e.target.value.slice(0, 20))} placeholder="08012345678" className="rounded-xl" maxLength={20} />
+                    {validationErrors.phone && <p className="text-xs text-destructive">{validationErrors.phone}</p>}
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Email</label>
-                    <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Optional" className="rounded-xl" />
+                    <Input value={email} onChange={(e) => setEmail(e.target.value.slice(0, 255))} placeholder="Optional" className="rounded-xl" maxLength={255} />
+                    {validationErrors.email && <p className="text-xs text-destructive">{validationErrors.email}</p>}
                   </div>
                   {fulfillment === 'delivery' && (
                     <div className="space-y-1.5">
                       <label className="text-sm font-medium flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> Delivery Address *</label>
-                      <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Enter delivery address" className="rounded-xl" />
+                      <Input value={address} onChange={(e) => setAddress(e.target.value.slice(0, 500))} placeholder="Enter delivery address" className="rounded-xl" maxLength={500} />
+                      {validationErrors.address && <p className="text-xs text-destructive">{validationErrors.address}</p>}
                     </div>
                   )}
                   <div className="space-y-1.5">
                     <label className="text-sm font-medium flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Notes</label>
-                    <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any special instructions?" className="rounded-xl resize-none" rows={2} />
+                    <Textarea value={notes} onChange={(e) => setNotes(e.target.value.slice(0, 1000))} placeholder="Any special instructions?" className="rounded-xl resize-none" rows={2} maxLength={1000} />
                   </div>
                 </div>
 
                 <div className="flex gap-2">
                   <Button variant="ghost" onClick={() => setStep('cart')} className="flex-1"><ArrowLeft className="w-4 h-4 mr-1" /> Back</Button>
-                  <Button variant="hero" className="flex-1" disabled={!canProceedToPayment} onClick={() => setStep('payment')}>
+                  <Button variant="hero" className="flex-1" disabled={!canProceedToPayment} onClick={() => { if (validateDetails()) setStep('payment'); }}>
                     Continue to Pay
                   </Button>
                 </div>
