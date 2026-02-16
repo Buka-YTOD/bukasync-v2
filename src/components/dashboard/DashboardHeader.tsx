@@ -1,7 +1,7 @@
 import { Bell, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { ProfileDropdown } from './ProfileDropdown';
+import { NotificationsDropdown } from './NotificationsDropdown';
 
 export function DashboardHeader() {
   return (
@@ -24,18 +24,8 @@ export function DashboardHeader() {
           />
         </div>
 
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="w-5 h-5" />
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-accent text-accent-foreground text-xs rounded-full flex items-center justify-center">
-            3
-          </span>
-        </Button>
-
-        <Avatar>
-          <AvatarFallback className="bg-primary text-primary-foreground font-medium">
-            MK
-          </AvatarFallback>
-        </Avatar>
+        <NotificationsDropdown />
+        <ProfileDropdown />
       </div>
     </header>
   );
