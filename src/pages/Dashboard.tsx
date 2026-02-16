@@ -6,6 +6,7 @@ import { OrdersPanel } from '@/components/dashboard/OrdersPanel';
 import { MenuManagement } from '@/components/dashboard/MenuManagement';
 import { AlertsPanel } from '@/components/dashboard/AlertsPanel';
 import { TablesPanel } from '@/components/dashboard/TablesPanel';
+import { SettingsPanel } from '@/components/dashboard/SettingsPanel';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('orders');
@@ -20,6 +21,8 @@ export default function Dashboard() {
         return <MenuManagement />;
       case 'alerts':
         return <AlertsPanel />;
+      case 'settings':
+        return <SettingsPanel />;
       default:
         return <OrdersPanel />;
     }

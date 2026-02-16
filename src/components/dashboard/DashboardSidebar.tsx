@@ -1,15 +1,12 @@
 import { motion } from 'framer-motion';
 import { 
-  LayoutDashboard, 
   ClipboardList, 
   UtensilsCrossed, 
   Bell, 
   Settings,
-  LogOut,
   ChefHat,
   QrCode
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 
 interface DashboardSidebarProps {
@@ -22,6 +19,7 @@ const navItems = [
   { id: 'tables', label: 'Tables & QR', icon: QrCode },
   { id: 'menu', label: 'Menu', icon: UtensilsCrossed },
   { id: 'alerts', label: 'Alerts', icon: Bell },
+  { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
 export function DashboardSidebar({ activeTab, onTabChange }: DashboardSidebarProps) {
@@ -59,27 +57,13 @@ export function DashboardSidebar({ activeTab, onTabChange }: DashboardSidebarPro
               {item.label}
               {item.id === 'alerts' && (
                 <span className="ml-auto bg-accent text-accent-foreground text-xs px-2 py-0.5 rounded-full">
-                  3
+                  !
                 </span>
               )}
             </button>
           );
         })}
       </nav>
-
-      <div className="p-4 border-t border-sidebar-border space-y-1">
-        <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors">
-          <Settings className="w-5 h-5" />
-          Settings
-        </button>
-        <Link
-          to="/"
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
-        >
-          <LogOut className="w-5 h-5" />
-          Sign Out
-        </Link>
-      </div>
     </motion.aside>
   );
 }
