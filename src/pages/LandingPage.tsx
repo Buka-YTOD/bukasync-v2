@@ -126,10 +126,14 @@ export default function LandingPage() {
               className="relative"
             >
               <div className="relative rounded-2xl overflow-hidden shadow-medium">
-                <img
+              <img
                   src={heroImage}
                   alt="Restaurant ordering with BukaSync"
                   className="w-full aspect-video object-cover"
+                  fetchPriority="high"
+                  decoding="async"
+                  width={800}
+                  height={450}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-foreground/50 to-transparent" />
               </div>
